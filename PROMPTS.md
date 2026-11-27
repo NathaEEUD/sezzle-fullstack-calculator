@@ -15,6 +15,7 @@ The design stages (agent skills setup through to-tickets) are reused as they wer
 | Spec: to-spec | — | [Spec: to-spec](#spec-to-spec) |
 | Plan: to-tickets | — | [Plan: to-tickets](#plan-to-tickets) |
 | Build: walking skeleton (#4) | [`bafb1d07`](docs/prompts/2026-11-27-0911-bafb1d07.md) | [Build: walking skeleton](#build-walking-skeleton) |
+| Build: immediate execution (#5) | [`b319431a`](docs/prompts/2026-11-27-0935-b319431a.md) | [Build: immediate execution](#build-immediate-execution) |
 
 ## Setup: prompt capture
 
@@ -113,6 +114,32 @@ The raw log for this session also holds the two reviewers' reports, at 09:23. Th
 
 ````text
 /mattpocock-skills:implement 4 in a new branch
+````
+
+````text
+log this session in PROMPTS.md and open a PR
+````
+
+## Build: immediate execution
+
+Ran Matt Pocock's `implement` on [#5](https://github.com/NathaEEUD/sezzle-fullstack-calculator/issues/5) in a new branch. The `tdd` seams were the ones `CODING_STANDARDS.md` already names, so they weren't proposed again. Those seams were calc table tests, a `formatForDisplay` table test, plain reducer tests, Testing Library with a fake client, and the `@issue-5` Playwright test on Chromium and 360 px. Each slice went red, then green. The exception was operator replacement and the after-a-result rules: their tests passed on the first run, because the existing reducer already behaved that way.
+
+In-flight keys were left to #9 and the finiteness check to #7.
+
+The `code-review` skill then ran its Standards and Spec reviews in parallel. Their fixes landed in a second commit:
+
+- a calc row expecting `+Inf` was dropped, because it pinned behaviour #7 will change;
+- the glossary's _Avoid_ terms (`value`, "chains" on its own) appeared in code and test names;
+- the pending operation got its own type.
+
+The Standards review also reported that coverage and evidence weren't committed. That was wrong: they were in the first commit, and the review's diff command excluded them.
+
+Midway through, another session switched the shared checkout to another branch. This session finished in its own worktree, as `AGENTS.md` prescribes for parallel slices.
+
+The raw log for this session also holds the two reviewers' reports, at 09:41. The hook captured them because they reached the session as messages, but nobody typed them.
+
+````text
+/mattpocock-skills:implement 5 in a new branch
 ````
 
 ````text
