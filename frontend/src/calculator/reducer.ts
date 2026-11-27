@@ -8,8 +8,11 @@ import type {
   UnaryOperationName,
 } from './operations'
 
+/** The binary operations an operator key can make the pending operation; percent is applied at once instead. */
+export type PendableOperationName = Exclude<BinaryOperationName, 'percent'>
+
 /** A binary operation waiting for its right operand. */
-export type PendingOperation = { operation: BinaryOperationName; left: number }
+export type PendingOperation = { operation: PendableOperationName; left: number }
 
 export type CalculatorState = {
   /**
@@ -24,7 +27,7 @@ export type CalculatorState = {
   /** The calculation the service must evaluate before the next key, if any. */
   calculation: Calculation | null
   /** The operation whose operator key sent the calculation; it becomes the pending operation once the result arrives. */
-  nextOperation: BinaryOperationName | null
+  nextOperation: PendableOperationName | null
   /** The most recently evaluated binary operation with its right operand, for repeated equals. */
   lastCalculation: { operation: BinaryOperationName; right: number } | null
   /** The service alert's message after service unavailable, until the next keypress. */
@@ -38,8 +41,9 @@ export type KeyEvent =
   | { type: 'decimalPoint' }
   | { type: 'deleteLastDigit' }
   | { type: 'clear' }
-  | { type: 'operator'; operation: BinaryOperationName }
+  | { type: 'operator'; operation: PendableOperationName }
   | { type: 'unaryOperator'; operation: UnaryOperationName }
+  | { type: 'percent' }
   | { type: 'equals' }
 
 export type CalculatorEvent = KeyEvent | { type: 'outcome'; outcome: Outcome }
@@ -115,6 +119,12 @@ function applyKey(state: CalculatorState, event: KeyEvent): CalculatorState {
         ...state,
         calculation: { operation: event.operation, operands: [currentNumber(state)] },
       }
+    case 'percent':
+      if (state.pending !== null && state.entry === '') return state
+      return {
+        ...state,
+        calculation: { operation: 'percent', operands: [currentNumber(state), percentBase(state)] },
+      }
     case 'equals':
       if (state.pending === null) return repeatedEquals(state)
       if (state.entry === '') return state
@@ -122,13 +132,18 @@ function applyKey(state: CalculatorState, event: KeyEvent): CalculatorState {
   }
 }
 
+/** The left operand when add or subtract is pending, otherwise 1 (ADR-0003). */
+function percentBase({ pending }: CalculatorState): number {
+  return pending?.operation === 'add' || pending?.operation === 'subtract' ? pending.left : 1
+}
+
 function applyOutcome(state: CalculatorState, outcome: Outcome): CalculatorState {
   const { calculation } = state
   if (calculation === null) return state
   switch (outcome.kind) {
     case 'ok':
-      if (isUnary(calculation)) {
-        // Applied at once: its result becomes the entry, and the pending operation stays.
+      if (isUnary(calculation) || calculation.operation === 'percent') {
+        // Applied at once: its result becomes the entry, and the pending operation and last calculation stay.
         return { ...state, entry: outcome.result, calculation: null, serviceAlert: null }
       }
       return {

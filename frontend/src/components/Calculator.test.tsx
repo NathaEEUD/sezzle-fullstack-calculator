@@ -54,6 +54,7 @@ describe('Calculator', () => {
       'subtract',
       'multiply',
       'divide',
+      'percent',
       'power',
       'square root',
       'equals',
@@ -103,6 +104,29 @@ describe('Calculator', () => {
       expect(screen.getByRole('status', { name: 'display' })).toHaveTextContent(/^5$/),
     )
     expect(calculations).toEqual([{ operation: 'add', operands: [2, 3] }])
+  })
+
+  it('taps 200 + 10 % = and shows 220 using the percent base', async () => {
+    const user = userEvent.setup()
+    const results: Record<string, number> = { 'percent 10,200': 20, 'add 200,20': 220 }
+    const { client, calculations } = fakeClient(({ operation, operands }) => ({
+      kind: 'ok',
+      result: results[`${operation} ${operands.join(',')}`],
+    }))
+    render(<Calculator client={client} />)
+    const display = screen.getByRole('status', { name: 'display' })
+
+    for (const name of ['2', '0', '0', 'add', '1', '0', 'percent']) {
+      await user.click(screen.getByRole('button', { name }))
+    }
+    await waitFor(() => expect(display).toHaveTextContent(/^20$/))
+    await user.click(screen.getByRole('button', { name: 'equals' }))
+
+    await waitFor(() => expect(display).toHaveTextContent(/^220$/))
+    expect(calculations).toEqual([
+      { operation: 'percent', operands: [10, 200] },
+      { operation: 'add', operands: [200, 20] },
+    ])
   })
 
   it('taps 2 + 3 × 4 = and chains the result with immediate execution', async () => {

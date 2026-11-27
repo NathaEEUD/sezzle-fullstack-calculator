@@ -34,6 +34,8 @@ var registry = map[string]entry{
 	"divide":   {arity: 2, apply: divide},
 	"power":    {arity: 2, apply: power},
 	"sqrt":     {arity: 1, apply: alwaysReal(func(o []float64) float64 { return math.Sqrt(o[0]) })},
+	// percent is "x percent of base"; the app picks the base (ADR-0003).
+	"percent": {arity: 2, apply: alwaysReal(func(o []float64) float64 { return o[0] * o[1] / 100 })},
 }
 
 // divisionByZero is the maths error for x ÷ 0 and for 0 to a negative power.
