@@ -30,13 +30,17 @@ func NewHandler(logger *slog.Logger, opts ...Option) http.Handler {
 	}
 
 	api := &api{logger: logger}
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v1/calculate", api.calculate)
-	mux.HandleFunc("GET /healthz", api.healthz)
-	if cfg.staticDir != "" {
-		mux.Handle("GET /", staticHandler(cfg.staticDir))
+	service := http.NewServeMux()
+	service.HandleFunc("POST /api/v1/calculate", api.calculate)
+	service.HandleFunc("GET /api/v1/operations", api.operations)
+	service.HandleFunc("GET /healthz", api.healthz)
+	if cfg.staticDir == "" {
+		return api.recoverPanics(api.route(service))
 	}
-	return mux
+
+	app := http.NewServeMux()
+	app.Handle("GET /", staticHandler(cfg.staticDir))
+	return api.recoverPanics(serviceOrApp(api.route(service), api.route(app)))
 }
 
 type api struct {

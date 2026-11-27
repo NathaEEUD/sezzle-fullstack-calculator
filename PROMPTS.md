@@ -16,6 +16,7 @@ The design stages (agent skills setup through to-tickets) are reused as they wer
 | Plan: to-tickets | — | [Plan: to-tickets](#plan-to-tickets) |
 | Build: walking skeleton (#4) | [`bafb1d07`](docs/prompts/2026-11-27-0911-bafb1d07.md) | [Build: walking skeleton](#build-walking-skeleton) |
 | Build: immediate execution (#5) | [`b319431a`](docs/prompts/2026-11-27-0935-b319431a.md) | [Build: immediate execution](#build-immediate-execution) |
+| Build: full API contract (#8) | [`bca4e311`](docs/prompts/2026-11-27-0940-bca4e311.md) | [Build: full API contract](#build-full-api-contract) |
 
 ## Setup: prompt capture
 
@@ -144,4 +145,30 @@ The raw log for this session also holds the two reviewers' reports, at 09:41. Th
 
 ````text
 log this session in PROMPTS.md and open a PR
+````
+
+## Build: full API contract
+
+Ran Matt Pocock's `implement` on [#8](https://github.com/NathaEEUD/sezzle-fullstack-calculator/issues/8) in a new branch. The branch was cut from `origin/main` while #5 was still unmerged, so the registry held only `add`. The `tdd` seams were the ones `CODING_STANDARDS.md` already names, so they weren't proposed again: calc table tests, `httptest` against the real `NewHandler` with the logger writing to a buffer, and the `@issue-8` Playwright contract test. Each slice went red, then green: the operations list, every 400 row, 404 and 405 envelopes with the `Allow` header, and panic recovery. The panic test uses a request body that panics when read, so it needs no test-only route. To prove the contract test catches drift, a fake operation was added to `OPERATIONS`, the test failed, and the change was reverted.
+
+The `code-review` skill then ran its Standards and Spec reviews in parallel. Their fixes landed in a second commit:
+
+- the operations `httptest` hard-coded the registry, so adding an operation would have meant an `httpapi` change; it now compares against `calc.Operations()` and checks the order on its own;
+- status choice was split between the error constructors and `statusFor`, and now lives only in `statusFor`;
+- panic recovery swallowed `http.ErrAbortHandler`, and now re-panics it;
+- the glossary's _Avoid_ term `op` appeared in code.
+
+Three findings were left as they are. Unknown fields are still found by matching Go's error text, because `encoding/json` has no typed error for them and a test pins the wording. A panic after a partial write isn't handled. And a `Calculation` type to bundle operation and operands would be a wider refactor than this slice.
+
+After #5 merged, the branch was rebased onto it. The only real conflict was the registry in `calc.go`. The calc operations test then failed as expected and now lists all four operations. Coverage and evidence were regenerated in a third commit.
+
+The raw log for this session also holds the two reviewers' reports, at 09:47. The hook captured them because they reached the session as messages, but nobody typed them.
+
+````text
+/mattpocock-skills:implement 8 in a new branch
+````
+
+````text
+* #5 is already merged, fix the small conflict
+* log this session in PROMPTS.md and open a PR
 ````
