@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { SERVICE_UNAVAILABLE_MESSAGE } from '../api/client'
-import type { OperationName } from './operations'
 import {
   calculatorReducer,
   displayText,
   initialState,
   type CalculatorEvent,
   type CalculatorState,
+  type PendableOperationName,
 } from './reducer'
 
 function press(...events: CalculatorEvent[]): CalculatorState {
@@ -19,7 +19,7 @@ function typeEntry(keys: string): CalculatorState {
 }
 
 const digit = (d: string): CalculatorEvent => ({ type: 'digit', digit: d })
-const operator = (operation: Exclude<OperationName, 'percent'>): CalculatorEvent => ({
+const operator = (operation: PendableOperationName): CalculatorEvent => ({
   type: 'operator',
   operation,
 })
@@ -334,11 +334,11 @@ describe('calculatorReducer', () => {
       expect(state.calculation).toEqual({ operation: 'percent', operands: [10, 1] })
     })
 
-    const twoHundredPlusTenPercent = () =>
+    const afterTwoHundredPlusTenPercent = () =>
       press(digit('2'), digit('0'), digit('0'), add, digit('1'), digit('0'), percent, ok(20))
 
     it('shows the percent result and keeps the pending operation', () => {
-      const state = twoHundredPlusTenPercent()
+      const state = afterTwoHundredPlusTenPercent()
 
       expect(displayText(state)).toBe('20')
       expect(state.pending).toEqual({ operation: 'add', left: 200 })
@@ -346,7 +346,7 @@ describe('calculatorReducer', () => {
     })
 
     it('gives 220 for 200 + 10 % =', () => {
-      const state = calculatorReducer(twoHundredPlusTenPercent(), equals)
+      const state = calculatorReducer(afterTwoHundredPlusTenPercent(), equals)
 
       expect(state.calculation).toEqual({ operation: 'add', operands: [200, 20] })
       expect(displayText(calculatorReducer(state, ok(220)))).toBe('220')
@@ -375,7 +375,7 @@ describe('calculatorReducer', () => {
     })
 
     it('applies the pending operation to the percent result on the next operator key', () => {
-      const state = calculatorReducer(twoHundredPlusTenPercent(), multiply)
+      const state = calculatorReducer(afterTwoHundredPlusTenPercent(), multiply)
 
       expect(state.calculation).toEqual({ operation: 'add', operands: [200, 20] })
     })
@@ -387,7 +387,7 @@ describe('calculatorReducer', () => {
     })
 
     it('starts a new entry when a digit follows the percent result', () => {
-      const state = calculatorReducer(twoHundredPlusTenPercent(), digit('5'))
+      const state = calculatorReducer(afterTwoHundredPlusTenPercent(), digit('5'))
 
       expect(displayText(state)).toBe('5')
       expect(calculatorReducer(state, equals).calculation).toEqual({
@@ -397,7 +397,7 @@ describe('calculatorReducer', () => {
     })
 
     it('takes the percent of the percent result when % is pressed again', () => {
-      const state = calculatorReducer(twoHundredPlusTenPercent(), percent)
+      const state = calculatorReducer(afterTwoHundredPlusTenPercent(), percent)
 
       expect(state.calculation).toEqual({ operation: 'percent', operands: [20, 200] })
     })
@@ -409,9 +409,18 @@ describe('calculatorReducer', () => {
     })
 
     it('repeats the pending operation, not percent, on repeated equals', () => {
-      const state = [equals, ok(220), equals].reduce(calculatorReducer, twoHundredPlusTenPercent())
+      const state = [equals, ok(220), equals].reduce(
+        calculatorReducer,
+        afterTwoHundredPlusTenPercent(),
+      )
 
       expect(state.calculation).toEqual({ operation: 'add', operands: [220, 20] })
+    })
+
+    it('does nothing on equals with nothing pending, as with a typed entry', () => {
+      const state = press(digit('5'), add, digit('3'), equals, ok(8), percent, ok(0.08))
+
+      expect(calculatorReducer(state, equals)).toBe(state)
     })
 
     it('keeps the state from before % when the service is unavailable', () => {

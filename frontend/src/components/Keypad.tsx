@@ -1,12 +1,11 @@
-import type { OperationName } from '../calculator/operations'
-import type { KeyEvent } from '../calculator/reducer'
+import type { KeyEvent, PendableOperationName } from '../calculator/reducer'
 import styles from './Keypad.module.css'
 
 type Key = { label: string; name: string; event: KeyEvent; wide?: boolean }
 
 const digit = (d: string): Key => ({ label: d, name: d, event: { type: 'digit', digit: d } })
 
-const operator = (label: string, operation: Exclude<OperationName, 'percent'>): Key => ({
+const operator = (label: string, operation: PendableOperationName): Key => ({
   label,
   name: operation,
   event: { type: 'operator', operation },

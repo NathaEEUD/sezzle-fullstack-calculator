@@ -1,8 +1,11 @@
 import { formatForDisplay } from './format'
 import type { Calculation, OperationName, Outcome } from './operations'
 
+/** The operations an operator key can make the pending operation; percent is applied at once instead. */
+export type PendableOperationName = Exclude<OperationName, 'percent'>
+
 /** A binary operation waiting for its right operand. */
-export type PendingOperation = { operation: OperationName; left: number }
+export type PendingOperation = { operation: PendableOperationName; left: number }
 
 export type CalculatorState = {
   /** The number being typed, or '' when nothing is being typed; '0' is a typed zero and makes the operand 0. */
@@ -16,7 +19,7 @@ export type CalculatorState = {
   /** The calculation the service must evaluate before the next key, if any. */
   calculation: Calculation | null
   /** The operation whose operator key sent the calculation; it becomes the pending operation once the result arrives. */
-  nextOperation: OperationName | null
+  nextOperation: PendableOperationName | null
   /** The most recently evaluated binary operation with its right operand, for repeated equals. */
   lastCalculation: { operation: OperationName; right: number } | null
   /** The service alert's message after service unavailable, until the next keypress. */
@@ -30,7 +33,7 @@ export type KeyEvent =
   | { type: 'decimalPoint' }
   | { type: 'deleteLastDigit' }
   | { type: 'clear' }
-  | { type: 'operator'; operation: Exclude<OperationName, 'percent'> }
+  | { type: 'operator'; operation: PendableOperationName }
   | { type: 'equals' }
   | { type: 'percent' }
 
@@ -175,7 +178,7 @@ function significantDigits(entry: string): number {
 
 /** Equals with nothing pending applies the last calculation again to the current result. */
 function repeatedEquals(state: CalculatorState): CalculatorState {
-  if (state.entry !== '' || state.lastCalculation === null) return state
+  if (rightOperand(state) !== null || state.lastCalculation === null) return state
   const { operation, right } = state.lastCalculation
   return { ...state, calculation: { operation, operands: [currentNumber(state), right] } }
 }
