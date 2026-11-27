@@ -1,0 +1,32 @@
+:root {
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --radius: 0.5rem;
+  --key-min-size: 3.5rem;
+  --key-font-size: 1.5rem;
+  --display-font-size: 2.5rem;
+  --title-font-size: 1.25rem;
+
+  --page-bg: #f5f5f4;
+  --page-fg: #1c1917;
+  --display-bg: #ffffff;
+  --display-fg: #1c1917;
+  --key-bg: #e7e5e4;
+  --key-bg-active: #d6d3d1;
+  --key-fg: #1c1917;
+
+  font-family: system-ui, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--page-fg);
+}

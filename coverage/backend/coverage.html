@@ -1,0 +1,434 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>calculator: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/cmd/calculator/main.go (0.0%)</option>
+				
+				<option value="file1">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/calc/calc.go (100.0%)</option>
+				
+				<option value="file2">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/calc/errors.go (100.0%)</option>
+				
+				<option value="file3">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/calculate.go (100.0%)</option>
+				
+				<option value="file4">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/errors.go (92.3%)</option>
+				
+				<option value="file5">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/handler.go (100.0%)</option>
+				
+				<option value="file6">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/static.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">// Command calculator runs the calculation service. It only reads env, wires
+// the handler and shuts down; the logic lives in internal/.
+package main
+
+import (
+        "context"
+        "errors"
+        "log/slog"
+        "net/http"
+        "os"
+        "os/signal"
+        "syscall"
+        "time"
+
+        "github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi"
+)
+
+func main() {
+        <span class="cov0" title="0">logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+        if err := run(logger); err != nil </span>{
+                <span class="cov0" title="0">logger.Error("server stopped", "error", err)
+                os.Exit(1)
+</span>        }
+}
+
+func run(logger *slog.Logger) error {
+        <span class="cov0" title="0">port := os.Getenv("PORT")
+        if port == "" </span>{
+                <span class="cov0" title="0">port = "8080"
+</span>        }
+        <span class="cov0" title="0">staticDir := os.Getenv("STATIC_DIR")
+</span>
+        <span class="cov0" title="0">srv := &amp;http.Server{
+                Addr:              ":" + port,
+                Handler:           httpapi.NewHandler(logger, httpapi.WithStaticDir(staticDir)),
+                ReadHeaderTimeout: 5 * time.Second,
+                ReadTimeout:       10 * time.Second,
+                WriteTimeout:      10 * time.Second,
+                IdleTimeout:       60 * time.Second,
+</span>        }
+
+        <span class="cov0" title="0">ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+        defer stop()
+</span>
+        <span class="cov0" title="0">errs := make(chan error, 1)
+        go func() </span>{
+                <span class="cov0" title="0">logger.Info("listening", "addr", srv.Addr, "static_dir", staticDir)
+                errs &lt;- srv.ListenAndServe()
+</span>        }()
+
+        <span class="cov0" title="0">select </span>{
+        case err := &lt;-errs:
+                <span class="cov0" title="0">return err</span>
+        case &lt;-ctx.Done():<span class="cov0" title="0"></span>
+        }
+
+        <span class="cov0" title="0">logger.Info("shutting down")
+        shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+        defer cancel()
+        if err := srv.Shutdown(shutdownCtx); err != nil </span>{
+                <span class="cov0" title="0">return err
+</span>        }
+        <span class="cov0" title="0">if err := &lt;-errs; !errors.Is(err, http.ErrServerClosed) </span>{
+                <span class="cov0" title="0">return err
+</span>        }
+        <span class="cov0" title="0">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">// Package calc evaluates calculations: one operation applied to its operands.
+// It is pure maths and knows nothing about HTTP.
+package calc
+
+import "fmt"
+
+type operation struct {
+        arity int
+        apply func(operands []float64) float64
+}
+
+// registry holds every operation the service can evaluate. Adding an
+// operation is one entry here and one table-test row.
+var registry = map[string]operation{
+        "add": {arity: 2, apply: func(o []float64) float64 { <span class="cov8" title="1">return o[0] + o[1] }</span>},
+}
+
+// Evaluate applies the named operation to its operands and returns the raw
+// result, or a *Error.
+func Evaluate(name string, operands []float64) (float64, error) {
+        <span class="cov8" title="1">operation, ok := registry[name]
+        if !ok </span>{
+                <span class="cov8" title="1">return 0, &amp;Error{Code: CodeUnknownOperation, Message: fmt.Sprintf("unknown operation %q", name)}
+</span>        }
+        <span class="cov8" title="1">if len(operands) != operation.arity </span>{
+                <span class="cov8" title="1">return 0, &amp;Error{
+                        Code:    CodeInvalidOperandCount,
+                        Message: fmt.Sprintf("expected %d operands for %s, got %d", operation.arity, name, len(operands)),
+</span>                }
+        }
+        <span class="cov8" title="1">return operation.apply(operands), nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package calc
+
+// Code is the stable name of a calc failure. Callers map it to a response;
+// calc itself knows nothing about transport.
+type Code string
+
+const (
+        CodeUnknownOperation    Code = "UNKNOWN_OPERATION"
+        CodeInvalidOperandCount Code = "INVALID_OPERAND_COUNT"
+)
+
+// Error is every failure Evaluate returns. Message names the specific cause.
+type Error struct {
+        Code    Code
+        Message string
+}
+
+func (e *Error) Error() string { <span class="cov8" title="1">return e.Message }</span>
+
+// Is makes errors.Is match any *Error with the same Code, so the sentinels
+// below work whatever the message.
+func (e *Error) Is(target error) bool {
+        <span class="cov8" title="1">t, ok := target.(*Error)
+        return ok &amp;&amp; t.Code == e.Code
+</span>}
+
+// Sentinels for errors.Is.
+var (
+        ErrUnknownOperation    = &amp;Error{Code: CodeUnknownOperation}
+        ErrInvalidOperandCount = &amp;Error{Code: CodeInvalidOperandCount}
+)
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package httpapi
+
+import (
+        "encoding/json"
+        "net/http"
+
+        "github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/calc"
+)
+
+type calculationRequest struct {
+        Operation string    `json:"operation"`
+        Operands  []float64 `json:"operands"`
+}
+
+type calculationResponse struct {
+        Operation string    `json:"operation"`
+        Operands  []float64 `json:"operands"`
+        Result    float64   `json:"result"`
+}
+
+func (a *api) calculate(w http.ResponseWriter, r *http.Request) {
+        <span class="cov8" title="1">var req calculationRequest
+        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span>{
+                <span class="cov8" title="1">a.writeError(w, r, &amp;requestError{code: codeInvalidJSON, message: "request body is not valid JSON"})
+                return
+</span>        }
+
+        <span class="cov8" title="1">result, err := calc.Evaluate(req.Operation, req.Operands)
+        if err != nil </span>{
+                <span class="cov8" title="1">a.writeError(w, r, err)
+                return
+</span>        }
+        <span class="cov8" title="1">a.writeJSON(w, r, http.StatusOK, calculationResponse{Operation: req.Operation, Operands: req.Operands, Result: result})</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package httpapi
+
+import (
+        "errors"
+        "net/http"
+
+        "github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/calc"
+)
+
+const (
+        codeInvalidJSON   = "INVALID_JSON"
+        codeInternalError = "INTERNAL_ERROR"
+)
+
+// requestError is a bad request found before any calculation runs.
+type requestError struct {
+        code    string
+        message string
+}
+
+func (e *requestError) Error() string { <span class="cov0" title="0">return e.message }</span>
+
+type envelope struct {
+        Error envelopeError `json:"error"`
+}
+
+type envelopeError struct {
+        Code    string `json:"code"`
+        Message string `json:"message"`
+}
+
+// statusFor is the one mapping from an error to its status and envelope.
+func statusFor(err error) (int, envelopeError) {
+        <span class="cov8" title="1">var reqErr *requestError
+        if errors.As(err, &amp;reqErr) </span>{
+                <span class="cov8" title="1">return http.StatusBadRequest, envelopeError{Code: reqErr.code, Message: reqErr.message}
+</span>        }
+        <span class="cov8" title="1">var calcErr *calc.Error
+        if errors.As(err, &amp;calcErr) </span>{
+                <span class="cov8" title="1">switch calcErr.Code </span>{
+                case calc.CodeUnknownOperation, calc.CodeInvalidOperandCount:
+                        <span class="cov8" title="1">return http.StatusBadRequest, envelopeError{Code: string(calcErr.Code), Message: calcErr.Message}</span>
+                }
+        }
+        <span class="cov8" title="1">return http.StatusInternalServerError, envelopeError{Code: codeInternalError, Message: "internal error"}</span>
+}
+
+// writeError answers with the envelope for err. Go error text goes to the log,
+// never to the response.
+func (a *api) writeError(w http.ResponseWriter, r *http.Request, err error) {
+        <span class="cov8" title="1">status, body := statusFor(err)
+        if status &gt;= http.StatusInternalServerError </span>{
+                <span class="cov8" title="1">a.logger.Error("request failed", "method", r.Method, "path", r.URL.Path, "error", err)
+</span>        }
+        <span class="cov8" title="1">a.writeJSON(w, r, status, envelope{Error: body})</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">// Package httpapi exposes the calculator over HTTP: routing, decoding and the
+// error envelope. HTTP status codes appear only in this package.
+package httpapi
+
+import (
+        "encoding/json"
+        "fmt"
+        "log/slog"
+        "net/http"
+)
+
+type config struct {
+        staticDir string
+}
+
+// Option configures NewHandler.
+type Option func(*config)
+
+// WithStaticDir serves the built app from dir for every non-API path.
+// An empty dir serves nothing, so callers can pass STATIC_DIR as it is.
+func WithStaticDir(dir string) Option {
+        <span class="cov8" title="1">return func(c *config) </span>{ <span class="cov8" title="1">c.staticDir = dir }</span>
+}
+
+// NewHandler builds every route and middleware of the service.
+func NewHandler(logger *slog.Logger, opts ...Option) http.Handler {
+        <span class="cov8" title="1">var cfg config
+        for _, opt := range opts </span>{
+                <span class="cov8" title="1">opt(&amp;cfg)
+</span>        }
+
+        <span class="cov8" title="1">api := &amp;api{logger: logger}
+        mux := http.NewServeMux()
+        mux.HandleFunc("POST /api/v1/calculate", api.calculate)
+        mux.HandleFunc("GET /healthz", api.healthz)
+        if cfg.staticDir != "" </span>{
+                <span class="cov8" title="1">mux.Handle("GET /", staticHandler(cfg.staticDir))
+</span>        }
+        <span class="cov8" title="1">return mux</span>
+}
+
+type api struct {
+        logger *slog.Logger
+}
+
+func (a *api) healthz(w http.ResponseWriter, r *http.Request) {
+        <span class="cov8" title="1">a.writeJSON(w, r, http.StatusOK, map[string]string{"status": "ok"})
+</span>}
+
+// writeJSON encodes body before writing any header, so a body that can't be
+// encoded becomes a 500 envelope instead of an empty 200.
+func (a *api) writeJSON(w http.ResponseWriter, r *http.Request, status int, body any) {
+        <span class="cov8" title="1">data, err := json.Marshal(body)
+        if err != nil </span>{
+                <span class="cov8" title="1">a.writeError(w, r, fmt.Errorf("encode response: %w", err))
+                return
+</span>        }
+        <span class="cov8" title="1">w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(status)
+        _, _ = w.Write(append(data, '\n'))</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package httpapi
+
+import (
+        "io/fs"
+        "net/http"
+        "os"
+        "path"
+        "strings"
+)
+
+// staticHandler serves the built app from dir. It never answers for /api/...,
+// and any path that isn't a file falls back to index.html so the app can route.
+func staticHandler(dir string) http.Handler {
+        <span class="cov8" title="1">fsys := os.DirFS(dir)
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span>{
+                <span class="cov8" title="1">if r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/") </span>{
+                        <span class="cov8" title="1">http.NotFound(w, r)
+                        return
+</span>                }
+                <span class="cov8" title="1">name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+                if info, err := fs.Stat(fsys, name); err != nil || info.IsDir() </span>{
+                        <span class="cov8" title="1">name = "index.html"
+</span>                }
+                <span class="cov8" title="1">http.ServeFileFS(w, r, fsys, name)</span>
+        })
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
