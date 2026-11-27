@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -16,8 +17,16 @@ import (
 
 func newHandler(t *testing.T, opts ...httpapi.Option) http.Handler {
 	t.Helper()
+	h, _ := newHandlerWithLogs(t, opts...)
+	return h
+}
+
+// newHandlerWithLogs builds the real handler with its logger writing JSON
+// lines to the returned buffer.
+func newHandlerWithLogs(t *testing.T, opts ...httpapi.Option) (http.Handler, *bytes.Buffer) {
+	t.Helper()
 	var logs bytes.Buffer
-	return httpapi.NewHandler(slog.New(slog.NewJSONHandler(&logs, nil)), opts...)
+	return httpapi.NewHandler(slog.New(slog.NewJSONHandler(&logs, nil)), opts...), &logs
 }
 
 func do(t *testing.T, h http.Handler, method, path, body string) *httptest.ResponseRecorder {
@@ -151,5 +160,153 @@ func TestWithoutStaticDirNoAppIsServed(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("status = %d, want 404", rec.Code)
+	}
+}
+
+func TestOperationsListsEveryOperationSortedByName(t *testing.T) {
+	rec := do(t, newHandler(t), http.MethodGet, "/api/v1/operations", "")
+
+	assertResponse(t, rec, http.StatusOK, `{"operations":[{"name":"add","arity":2}]}`)
+	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+}
+
+func TestCalculateAnswersEveryBadRequestWithItsCode(t *testing.T) {
+	valid := `{"operation":"add","operands":[2,3]}`
+	padding := strings.Repeat(" ", 1024)
+	tests := []struct {
+		name, body, code, message string
+	}{
+		{"malformed JSON", `{"operation":`, "INVALID_JSON", "request body is not valid JSON"},
+		{"empty body", "", "INVALID_JSON", "request body is empty"},
+		{"unknown field", `{"operation":"add","operands":[2,3],"precision":2}`,
+			"INVALID_JSON", `unknown field "precision"`},
+		{"trailing data", valid + ` {}`, "INVALID_JSON", "request body has data after the JSON object"},
+		{"trailing garbage", valid + `}`, "INVALID_JSON", "request body has data after the JSON object"},
+		{"body over 1024 bytes", padding + valid, "INVALID_JSON", "request body is over 1024 bytes"},
+		{"body over 1024 bytes after the JSON object", valid + padding,
+			"INVALID_JSON", "request body is over 1024 bytes"},
+		{"string operand", `{"operation":"add","operands":["2",3]}`,
+			"INVALID_JSON", "operands must be numbers, got string"},
+		{"null operand", `{"operation":"add","operands":[null,3]}`,
+			"INVALID_JSON", "operands must be numbers, got null"},
+		{"operand beyond float64", `{"operation":"add","operands":[1e400,3]}`,
+			"INVALID_JSON", "operand 1e400 is out of range"},
+		{"operands not an array", `{"operation":"add","operands":5}`,
+			"INVALID_JSON", "operands must be an array of numbers, got number"},
+		{"operation not a string", `{"operation":5,"operands":[2,3]}`,
+			"INVALID_JSON", "operation must be a string, got number"},
+		{"body not an object", `[2,3]`, "INVALID_JSON", "request body must be a JSON object"},
+		{"missing operation", `{"operands":[2,3]}`, "UNKNOWN_OPERATION", "operation is required"},
+		{"empty operation", `{"operation":"","operands":[2,3]}`, "UNKNOWN_OPERATION", "operation is required"},
+		{"operation not in the registry", `{"operation":"modulo","operands":[2,3]}`,
+			"UNKNOWN_OPERATION", `unknown operation "modulo"`},
+		{"missing operands", `{"operation":"add"}`,
+			"INVALID_OPERAND_COUNT", "expected 2 operands for add, got 0"},
+		{"too few operands", `{"operation":"add","operands":[2]}`,
+			"INVALID_OPERAND_COUNT", "expected 2 operands for add, got 1"},
+		{"too many operands", `{"operation":"add","operands":[2,3,4]}`,
+			"INVALID_OPERAND_COUNT", "expected 2 operands for add, got 3"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := do(t, newHandler(t), http.MethodPost, "/api/v1/calculate", tt.body)
+
+			want, _ := json.Marshal(map[string]map[string]string{"error": {"code": tt.code, "message": tt.message}})
+			assertResponse(t, rec, http.StatusBadRequest, string(want))
+		})
+	}
+}
+
+func TestCalculateAcceptsABodyOfExactly1024Bytes(t *testing.T) {
+	valid := `{"operation":"add","operands":[2,3]}`
+	body := valid + strings.Repeat(" ", 1024-len(valid))
+
+	rec := do(t, newHandler(t), http.MethodPost, "/api/v1/calculate", body)
+
+	assertResponse(t, rec, http.StatusOK, `{"operation":"add","operands":[2,3],"result":5}`)
+}
+
+func TestAnUnknownPathIsNotFound(t *testing.T) {
+	tests := []struct {
+		name, method, path string
+		opts               []httpapi.Option
+	}{
+		{"an unknown API path", http.MethodGet, "/api/v1/unknown", nil},
+		{"an unversioned API path", http.MethodPost, "/api/calculate", nil},
+		{"a future API version", http.MethodPost, "/api/v2/calculate", nil},
+		{"any path without a static dir", http.MethodGet, "/", nil},
+		{"an unknown API path with a static dir", http.MethodGet, "/api/v1/unknown",
+			[]httpapi.Option{httpapi.WithStaticDir(staticDir(t))}},
+		{"an unknown API path posted to with a static dir", http.MethodPost, "/api/v1/unknown",
+			[]httpapi.Option{httpapi.WithStaticDir(staticDir(t))}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := do(t, newHandler(t, tt.opts...), tt.method, tt.path, "")
+
+			assertResponse(t, rec, http.StatusNotFound,
+				`{"error":{"code":"NOT_FOUND","message":"no route for `+tt.method+` `+tt.path+`"}}`)
+			if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+				t.Errorf("Content-Type = %q, want application/json", ct)
+			}
+		})
+	}
+}
+
+func TestAWrongMethodIsNotAllowedAndNamesTheAllowedOnes(t *testing.T) {
+	tests := []struct {
+		name, method, path, allow string
+		opts                      []httpapi.Option
+	}{
+		{"calculate is POST only", http.MethodGet, "/api/v1/calculate", "POST", nil},
+		{"operations is GET only", http.MethodPost, "/api/v1/operations", "GET, HEAD", nil},
+		{"healthz is GET only", http.MethodDelete, "/healthz", "GET, HEAD", nil},
+		{"calculate is POST only with a static dir", http.MethodGet, "/api/v1/calculate", "POST",
+			[]httpapi.Option{httpapi.WithStaticDir(staticDir(t))}},
+		{"the app is GET only", http.MethodPost, "/some/route", "GET, HEAD",
+			[]httpapi.Option{httpapi.WithStaticDir(staticDir(t))}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := do(t, newHandler(t, tt.opts...), tt.method, tt.path, "")
+
+			assertResponse(t, rec, http.StatusMethodNotAllowed,
+				`{"error":{"code":"METHOD_NOT_ALLOWED","message":"method `+tt.method+` is not allowed on `+
+					tt.path+`; allowed: `+tt.allow+`"}}`)
+			if got := rec.Header().Get("Allow"); got != tt.allow {
+				t.Errorf("Allow = %q, want %q", got, tt.allow)
+			}
+		})
+	}
+}
+
+// panickingBody panics the first time a handler reads the request body.
+type panickingBody struct{}
+
+func (panickingBody) Read([]byte) (int, error) { panic("body reader exploded") }
+
+func TestAPanicInAHandlerIsAnInternalErrorAndIsLogged(t *testing.T) {
+	h, logs := newHandlerWithLogs(t)
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/calculate", panickingBody{}))
+
+	assertResponse(t, rec, http.StatusInternalServerError,
+		`{"error":{"code":"INTERNAL_ERROR","message":"internal error"}}`)
+	if strings.Contains(rec.Body.String(), "exploded") {
+		t.Errorf("body = %s, want no panic text", rec.Body.String())
+	}
+
+	var entry map[string]any
+	if err := json.Unmarshal(logs.Bytes(), &entry); err != nil {
+		t.Fatalf("log = %q, want one JSON line: %v", logs.String(), err)
+	}
+	if entry["level"] != "ERROR" || entry["path"] != "/api/v1/calculate" || entry["method"] != "POST" {
+		t.Errorf("log entry = %v, want an ERROR for POST /api/v1/calculate", entry)
+	}
+	if msg, _ := entry["error"].(string); !strings.Contains(msg, "body reader exploded") {
+		t.Errorf("log error = %q, want the panic value", msg)
 	}
 }
