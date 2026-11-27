@@ -21,6 +21,9 @@ export type CalculatorState = {
 
 export type CalculatorEvent =
   | { type: 'digit'; digit: string }
+  | { type: 'decimalPoint' }
+  | { type: 'deleteLastDigit' }
+  | { type: 'clear' }
   | { type: 'operator'; operation: OperationName }
   | { type: 'equals' }
   | { type: 'outcome'; outcome: Outcome }
@@ -34,11 +37,23 @@ export const initialState: CalculatorState = {
   lastCalculation: null,
 }
 
+/** An entry stops accepting digits once it holds this many significant digits. */
+const MAX_SIGNIFICANT_DIGITS = 15
+
 /** Every keypad rule. It never does arithmetic: results arrive as outcome events. */
 export function calculatorReducer(state: CalculatorState, event: CalculatorEvent): CalculatorState {
   switch (event.type) {
     case 'digit':
-      return { ...state, entry: state.entry + event.digit }
+      if (significantDigits(state.entry) >= MAX_SIGNIFICANT_DIGITS) return state
+      return { ...state, entry: (state.entry === '0' ? '' : state.entry) + event.digit }
+    case 'decimalPoint':
+      if (state.entry.includes('.')) return state
+      return { ...state, entry: (state.entry === '' ? '0' : state.entry) + '.' }
+    case 'deleteLastDigit':
+      if (state.entry === '') return state
+      return { ...state, entry: state.entry.slice(0, -1) || '0' }
+    case 'clear':
+      return initialState
     case 'operator':
       if (state.pending !== null && state.entry !== '') {
         return {
@@ -72,6 +87,11 @@ export function calculatorReducer(state: CalculatorState, event: CalculatorEvent
       }
     }
   }
+}
+
+/** The digits of an entry, not counting the decimal point or zeros before the first non-zero digit. */
+function significantDigits(entry: string): number {
+  return entry.replace('.', '').replace(/^0+/, '').length
 }
 
 /** Equals with nothing pending applies the last calculation again to the current result. */
