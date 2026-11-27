@@ -7,6 +7,8 @@ type Code string
 const (
 	CodeUnknownOperation    Code = "UNKNOWN_OPERATION"
 	CodeInvalidOperandCount Code = "INVALID_OPERAND_COUNT"
+	CodeDivisionByZero      Code = "DIVISION_BY_ZERO"
+	CodeOverflow            Code = "OVERFLOW"
 )
 
 // Error is every failure Evaluate returns. Message names the specific cause.
@@ -28,4 +30,6 @@ func (e *Error) Is(target error) bool {
 var (
 	ErrUnknownOperation    = &Error{Code: CodeUnknownOperation}
 	ErrInvalidOperandCount = &Error{Code: CodeInvalidOperandCount}
+	ErrDivisionByZero      = &Error{Code: CodeDivisionByZero}
+	ErrOverflow            = &Error{Code: CodeOverflow}
 )

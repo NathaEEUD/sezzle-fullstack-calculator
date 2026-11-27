@@ -65,9 +65,9 @@
 				
 				<option value="file4">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/cors.go (100.0%)</option>
 				
-				<option value="file5">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/errors.go (93.8%)</option>
+				<option value="file5">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/errors.go (94.1%)</option>
 				
-				<option value="file6">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/handler.go (100.0%)</option>
+				<option value="file6">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/handler.go (92.3%)</option>
 				
 				<option value="file7">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/middleware.go (97.6%)</option>
 				
@@ -174,6 +174,7 @@ package calc
 import (
         "fmt"
         "maps"
+        "math"
         "slices"
 )
 
@@ -185,20 +186,33 @@ type Operation struct {
 
 type entry struct {
         arity int
-        apply func(operands []float64) float64
+        apply func(operands []float64) (float64, error)
+}
+
+// value wraps an operation that always has a real result.
+func value(f func(o []float64) float64) func([]float64) (float64, error) {
+        <span class="cov8" title="1">return func(o []float64) (float64, error) </span>{ <span class="cov8" title="1">return f(o), nil }</span>
 }
 
 // registry holds every operation the service can evaluate. Adding an
 // operation is one entry here and one table-test row.
 var registry = map[string]entry{
-        "add":      {arity: 2, apply: func(o []float64) float64 { <span class="cov8" title="1">return o[0] + o[1] }</span>},
-        "subtract": {arity: 2, apply: func(o []float64) float64 { <span class="cov8" title="1">return o[0] - o[1] }</span>},
-        "multiply": {arity: 2, apply: func(o []float64) float64 { <span class="cov8" title="1">return o[0] * o[1] }</span>},
-        "divide":   {arity: 2, apply: func(o []float64) float64 { <span class="cov8" title="1">return o[0] / o[1] }</span>},
+        "add":      {arity: 2, apply: value(func(o []float64) float64 { <span class="cov8" title="1">return o[0] + o[1] }</span>)},
+        "subtract": {arity: 2, apply: value(func(o []float64) float64 { <span class="cov8" title="1">return o[0] - o[1] }</span>)},
+        "multiply": {arity: 2, apply: value(func(o []float64) float64 { <span class="cov8" title="1">return o[0] * o[1] }</span>)},
+        "divide":   {arity: 2, apply: divide},
+}
+
+func divide(o []float64) (float64, error) {
+        <span class="cov8" title="1">if o[1] == 0 </span>{
+                <span class="cov8" title="1">return 0, &amp;Error{Code: CodeDivisionByZero, Message: "Cannot divide by zero"}
+</span>        }
+        <span class="cov8" title="1">return o[0] / o[1], nil</span>
 }
 
 // Evaluate applies the named operation to its operands and returns the raw
-// result, or a *Error.
+// result, or a *Error. Every result passes one finiteness check, so a caller
+// never sees ±Inf.
 func Evaluate(name string, operands []float64) (float64, error) {
         <span class="cov8" title="1">if name == "" </span>{
                 <span class="cov8" title="1">return 0, &amp;Error{Code: CodeUnknownOperation, Message: "operation is required"}
@@ -213,7 +227,14 @@ func Evaluate(name string, operands []float64) (float64, error) {
                         Message: fmt.Sprintf("expected %d operands for %s, got %d", found.arity, name, len(operands)),
 </span>                }
         }
-        <span class="cov8" title="1">return found.apply(operands), nil</span>
+        <span class="cov8" title="1">result, err := found.apply(operands)
+        if err != nil </span>{
+                <span class="cov8" title="1">return 0, err
+</span>        }
+        <span class="cov8" title="1">if math.IsInf(result, 0) </span>{
+                <span class="cov8" title="1">return 0, &amp;Error{Code: CodeOverflow, Message: "Result too large"}
+</span>        }
+        <span class="cov8" title="1">return result, nil</span>
 }
 
 // Operations lists every operation in the registry, sorted by name.
@@ -236,6 +257,8 @@ type Code string
 const (
         CodeUnknownOperation    Code = "UNKNOWN_OPERATION"
         CodeInvalidOperandCount Code = "INVALID_OPERAND_COUNT"
+        CodeDivisionByZero      Code = "DIVISION_BY_ZERO"
+        CodeOverflow            Code = "OVERFLOW"
 )
 
 // Error is every failure Evaluate returns. Message names the specific cause.
@@ -257,6 +280,8 @@ func (e *Error) Is(target error) bool {
 var (
         ErrUnknownOperation    = &amp;Error{Code: CodeUnknownOperation}
         ErrInvalidOperandCount = &amp;Error{Code: CodeInvalidOperandCount}
+        ErrDivisionByZero      = &amp;Error{Code: CodeDivisionByZero}
+        ErrOverflow            = &amp;Error{Code: CodeOverflow}
 )
 </pre>
 		
@@ -497,6 +522,8 @@ func statusFor(err error) (int, envelopeError) {
                 <span class="cov8" title="1">switch calcErr.Code </span>{
                 case calc.CodeUnknownOperation, calc.CodeInvalidOperandCount:
                         <span class="cov8" title="1">return http.StatusBadRequest, envelopeError{Code: string(calcErr.Code), Message: calcErr.Message}</span>
+                case calc.CodeDivisionByZero, calc.CodeOverflow:
+                        <span class="cov8" title="1">return http.StatusUnprocessableEntity, envelopeError{Code: string(calcErr.Code), Message: calcErr.Message}</span>
                 }
         }
         <span class="cov8" title="1">return http.StatusInternalServerError, envelopeError{Code: codeInternalError, Message: "internal error"}</span>
@@ -579,7 +606,7 @@ func (a *api) healthz(w http.ResponseWriter, r *http.Request) {
 func (a *api) writeJSON(w http.ResponseWriter, r *http.Request, status int, body any) {
         <span class="cov8" title="1">data, err := json.Marshal(body)
         if err != nil </span>{
-                <span class="cov8" title="1">a.writeError(w, r, fmt.Errorf("encode response: %w", err))
+                <span class="cov0" title="0">a.writeError(w, r, fmt.Errorf("encode response: %w", err))
                 return
 </span>        }
         <span class="cov8" title="1">w.Header().Set("Content-Type", "application/json")

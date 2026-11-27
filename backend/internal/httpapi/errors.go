@@ -69,6 +69,8 @@ func statusFor(err error) (int, envelopeError) {
 		switch calcErr.Code {
 		case calc.CodeUnknownOperation, calc.CodeInvalidOperandCount:
 			return http.StatusBadRequest, envelopeError{Code: string(calcErr.Code), Message: calcErr.Message}
+		case calc.CodeDivisionByZero, calc.CodeOverflow:
+			return http.StatusUnprocessableEntity, envelopeError{Code: string(calcErr.Code), Message: calcErr.Message}
 		}
 	}
 	return http.StatusInternalServerError, envelopeError{Code: codeInternalError, Message: "internal error"}
