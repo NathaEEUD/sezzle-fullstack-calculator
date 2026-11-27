@@ -106,6 +106,44 @@ describe('Calculator', () => {
     expect(calculations).toEqual([{ operation: 'add', operands: [2, 3] }])
   })
 
+  describe('keyboard', () => {
+    it('types 2 + 3 Enter and shows the result from the service', async () => {
+      const user = userEvent.setup()
+      const { client, calculations } = fakeClient({ kind: 'ok', result: 5 })
+      render(<Calculator client={client} />)
+
+      await user.keyboard('2+3{Enter}')
+
+      await waitFor(() =>
+        expect(screen.getByRole('status', { name: 'display' })).toHaveTextContent(/^5$/),
+      )
+      expect(calculations).toEqual([{ operation: 'add', operands: [2, 3] }])
+    })
+
+    it('presses equals, not the focused key, on Enter after a click', async () => {
+      const user = userEvent.setup()
+      const { client, calculations } = fakeClient({ kind: 'ok', result: 0 })
+      render(<Calculator client={client} />)
+
+      await user.click(screen.getByRole('button', { name: '7' }))
+      expect(screen.getByRole('button', { name: '7' })).toHaveFocus()
+      await user.keyboard('{Enter}')
+
+      expect(screen.getByRole('status', { name: 'display' })).toHaveTextContent(/^7$/)
+      expect(calculations).toEqual([])
+    })
+
+    it('presses the focused key with Space', async () => {
+      const user = userEvent.setup()
+      render(<Calculator client={fakeClient({ kind: 'ok', result: 0 }).client} />)
+
+      screen.getByRole('button', { name: '7' }).focus()
+      await user.keyboard(' ')
+
+      expect(screen.getByRole('status', { name: 'display' })).toHaveTextContent(/^7$/)
+    })
+  })
+
   it('taps 200 + 10 % = and shows 220 using the percent base', async () => {
     const user = userEvent.setup()
     const results: Record<string, number> = { 'percent 10,200': 20, 'add 200,20': 220 }

@@ -1,6 +1,6 @@
 .keypad {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-2);
 }
 
@@ -14,12 +14,48 @@
   font: inherit;
   font-size: var(--key-font-size);
   cursor: pointer;
+  touch-action: manipulation;
 }
 
 .key:active {
   background: var(--key-bg-active);
 }
 
-.fullRow {
+.key:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.operator {
+  background: var(--operator-key-bg);
+  color: var(--operator-key-fg);
+}
+
+.operator:active {
+  background: var(--operator-key-bg-active);
+}
+
+.equals {
   grid-column: 1 / -1;
+  background: var(--equals-key-bg);
+  color: var(--equals-key-fg);
+}
+
+.equals:active {
+  background: var(--equals-key-bg-active);
+}
+
+/* Only where hover is real, so a tapped key on a touch screen does not stay highlighted. */
+@media (hover: hover) {
+  .key:hover {
+    background: var(--key-bg-hover);
+  }
+
+  .operator:hover {
+    background: var(--operator-key-bg-hover);
+  }
+
+  .equals:hover {
+    background: var(--equals-key-bg-hover);
+  }
 }

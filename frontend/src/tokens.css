@@ -1,25 +1,66 @@
+/* Every colour and size the components use. Dark mode overrides the colour tokens only.
+   Each text and background pair meets WCAG AA (4.5:1); the focus ring meets 3:1 against the page. */
 :root {
+  color-scheme: light dark;
+
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
   --radius: 0.5rem;
   --key-min-size: 3.5rem;
   --key-font-size: 1.5rem;
-  --display-font-size: 2.5rem;
+  --display-font-size: clamp(1.75rem, 9vw, 2.5rem);
   --title-font-size: 1.25rem;
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 2px;
 
   --page-bg: #f5f5f4;
   --page-fg: #1c1917;
   --display-bg: #ffffff;
   --display-fg: #1c1917;
   --key-bg: #e7e5e4;
+  --key-bg-hover: #dedad7;
   --key-bg-active: #d6d3d1;
   --key-fg: #1c1917;
+  --operator-key-bg: #ffedd5;
+  --operator-key-bg-hover: #fed7aa;
+  --operator-key-bg-active: #fdba74;
+  --operator-key-fg: #7c2d12;
+  --equals-key-bg: #c2410c;
+  --equals-key-bg-hover: #b13c0b;
+  --equals-key-bg-active: #9a3412;
+  --equals-key-fg: #ffffff;
+  --focus-ring: #1d4ed8;
   --alert-bg: #fef2f2;
   --alert-fg: #991b1b;
   --alert-border: #fca5a5;
 
   font-family: system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page-bg: #1c1917;
+    --page-fg: #f5f5f4;
+    --display-bg: #0c0a09;
+    --display-fg: #fafaf9;
+    --key-bg: #44403c;
+    --key-bg-hover: #4e4945;
+    --key-bg-active: #57534e;
+    --key-fg: #fafaf9;
+    --operator-key-bg: #7c2d12;
+    --operator-key-bg-hover: #8a3315;
+    --operator-key-bg-active: #9a3412;
+    --operator-key-fg: #ffedd5;
+    --equals-key-bg: #fb923c;
+    --equals-key-bg-hover: #fca15a;
+    --equals-key-bg-active: #fdba74;
+    --equals-key-fg: #1c1917;
+    --focus-ring: #93c5fd;
+    --alert-bg: #450a0a;
+    --alert-fg: #fecaca;
+    --alert-border: #b91c1c;
+  }
 }
 
 *,
