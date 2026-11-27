@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from 'react'
+import { useCallback, useEffect, useReducer } from 'react'
 import type { CalculatorClient } from '../api/client'
 import { calculatorReducer, displayText, initialState, type KeyEvent } from './reducer'
 
@@ -17,9 +17,8 @@ export function useCalculator(client: CalculatorClient) {
     }
   }, [client, state.calculation])
 
-  return {
-    display: displayText(state),
-    serviceAlert: state.serviceAlert,
-    onKey: (key: KeyEvent) => dispatch(key),
-  }
+  // Stable across renders, so the keypad's keyboard listener isn't re-attached on every keypress.
+  const onKey = useCallback((key: KeyEvent) => dispatch(key), [])
+
+  return { display: displayText(state), serviceAlert: state.serviceAlert, onKey }
 }

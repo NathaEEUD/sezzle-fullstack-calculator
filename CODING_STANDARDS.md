@@ -58,7 +58,7 @@ What a reviewer checks on every PR. Each line is a yes or no. A "no" blocks the 
 - Styles are CSS Modules per component; colours and sizes come from custom properties in `tokens.css`, and dark mode overrides tokens under `prefers-color-scheme`.
 - Every key is a `<button>` with an accessible name ("multiply", "square root", "delete last digit").
 - The display is an `<output aria-live="polite">`, and the service alert has `role="alert"`.
-- Every key has a keyboard binding (`0–9 . + - * / ^ % Enter = Backspace Escape`) and a visible `:focus-visible` ring.
+- Every key has a keyboard binding (`0–9 . + - * / ^ % Enter = Backspace Escape`, and `r` for square root) and a visible `:focus-visible` ring. A bound key wins over the focused button, Space presses the focused button, and Ctrl, Cmd and Alt shortcuts are left to the browser.
 - Text and keys meet WCAG AA contrast, touch targets are at least 44×44 px, the layout works from 320 px, and the viewport meta allows zoom.
 
 ## Tests
