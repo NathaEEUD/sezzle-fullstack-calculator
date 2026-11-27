@@ -75,6 +75,8 @@
 				
 				<option value="file9">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/static.go (100.0%)</option>
 				
+				<option value="file10">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/logging/logging.go (100.0%)</option>
+				
 				</select>
 			</div>
 			<div id="legend">
@@ -102,18 +104,16 @@ import (
         "time"
 
         "github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi"
+        "github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/logging"
 )
 
 func main() {
-        <span class="cov0" title="0">var level slog.Level // info when LOG_LEVEL is unset
-        if v := os.Getenv("LOG_LEVEL"); v != "" </span>{
-                <span class="cov0" title="0">if err := level.UnmarshalText([]byte(v)); err != nil </span>{
-                        <span class="cov0" title="0">slog.New(slog.NewJSONHandler(os.Stdout, nil)).Error("invalid LOG_LEVEL", "value", v, "error", err)
-                        os.Exit(1)
-</span>                }
-        }
-        <span class="cov0" title="0">logger := slog.New(slog.NewJSONHandler(os.Stdout, &amp;slog.HandlerOptions{Level: level}))
-        if err := run(logger); err != nil </span>{
+        <span class="cov0" title="0">logger, err := logging.New(os.Stdout, os.Getenv("LOG_LEVEL"))
+        if err != nil </span>{
+                <span class="cov0" title="0">slog.Error("server not started", "error", err)
+                os.Exit(1)
+</span>        }
+        <span class="cov0" title="0">if err := run(logger); err != nil </span>{
                 <span class="cov0" title="0">logger.Error("server stopped", "error", err)
                 os.Exit(1)
 </span>        }
@@ -391,8 +391,9 @@ func parseOrigins(list string) map[string]bool {
 
 // cors lets the allowed origins call the service from another origin. An
 // allowed preflight is answered here with 204; a disallowed one gets a bare
-// 403. Every other request reaches next, with CORS headers only for an
-// allowed origin. With no allowed origins it returns next unchanged.
+// 403. Every other request reaches next, with Access-Control-* headers only
+// for an allowed origin. Every response says Vary: Origin, because each one
+// depends on it. With no allowed origins it returns next unchanged.
 func cors(allowed map[string]bool, next http.Handler) http.Handler {
         <span class="cov8" title="1">if len(allowed) == 0 </span>{
                 <span class="cov8" title="1">return next
@@ -401,6 +402,8 @@ func cors(allowed map[string]bool, next http.Handler) http.Handler {
                 <span class="cov8" title="1">origin := r.Header.Get("Origin")
                 isPreflight := r.Method == http.MethodOptions &amp;&amp; origin != "" &amp;&amp;
                         r.Header.Get("Access-Control-Request-Method") != ""
+                h := w.Header()
+                h.Add("Vary", "Origin")
                 if !allowed[origin] </span>{
                         <span class="cov8" title="1">if isPreflight </span>{
                                 <span class="cov8" title="1">w.WriteHeader(http.StatusForbidden)
@@ -410,9 +413,7 @@ func cors(allowed map[string]bool, next http.Handler) http.Handler {
                         return</span>
                 }
 
-                <span class="cov8" title="1">h := w.Header()
-                h.Set("Access-Control-Allow-Origin", origin)
-                h.Add("Vary", "Origin")
+                <span class="cov8" title="1">h.Set("Access-Control-Allow-Origin", origin)
                 if isPreflight </span>{
                         <span class="cov8" title="1">h.Set("Access-Control-Allow-Methods", "GET, POST")
                         h.Set("Access-Control-Allow-Headers", "Content-Type")
@@ -750,6 +751,29 @@ func staticHandler(dir string) http.Handler {
 </span>                }
                 <span class="cov8" title="1">http.ServeFileFS(w, r, fsys, name)</span>
         })
+}
+</pre>
+		
+		<pre class="file" id="file10" style="display: none">// Package logging builds the service's logger from LOG_LEVEL.
+package logging
+
+import (
+        "fmt"
+        "io"
+        "log/slog"
+)
+
+// New returns a logger that writes JSON lines to w at the level named by
+// level (debug, info, warn or error, in any case). An empty level is info, so
+// callers can pass LOG_LEVEL as it is.
+func New(w io.Writer, level string) (*slog.Logger, error) {
+        <span class="cov8" title="1">var l slog.Level
+        if level != "" </span>{
+                <span class="cov8" title="1">if err := l.UnmarshalText([]byte(level)); err != nil </span>{
+                        <span class="cov8" title="1">return nil, fmt.Errorf("invalid LOG_LEVEL %q: want debug, info, warn or error", level)
+</span>                }
+        }
+        <span class="cov8" title="1">return slog.New(slog.NewJSONHandler(w, &amp;slog.HandlerOptions{Level: l})), nil</span>
 }
 </pre>
 		

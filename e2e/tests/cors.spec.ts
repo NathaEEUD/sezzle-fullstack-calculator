@@ -14,28 +14,23 @@ test(
     await page.goto('/')
     const calculateURL = `${otherOrigin(page.url())}/api/v1/calculate`
 
-    const sameOrigin = await page.evaluate(async () => {
-      const response = await fetch('/api/v1/calculate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operation: 'add', operands: [2, 3] }),
-      })
-      return response.status
-    })
-    expect(sameOrigin).toBe(200)
+    // Sends 2 + 3 from the page; a JSON body makes a cross-origin call preflight.
+    const sendCalculation = (url: string) =>
+      page.evaluate(async (url) => {
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ operation: 'add', operands: [2, 3] }),
+          })
+          return response.status
+        } catch (error) {
+          return (error as Error).name
+        }
+      }, url)
 
-    const crossOrigin = await page.evaluate(async (url) => {
-      try {
-        await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ operation: 'add', operands: [2, 3] }),
-        })
-        return 'answered'
-      } catch (error) {
-        return (error as Error).name
-      }
-    }, calculateURL)
+    expect(await sendCalculation('/api/v1/calculate')).toBe(200)
+    const crossOrigin = await sendCalculation(calculateURL)
     expect(crossOrigin).toBe('TypeError')
   },
 )

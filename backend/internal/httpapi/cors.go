@@ -19,8 +19,9 @@ func parseOrigins(list string) map[string]bool {
 
 // cors lets the allowed origins call the service from another origin. An
 // allowed preflight is answered here with 204; a disallowed one gets a bare
-// 403. Every other request reaches next, with CORS headers only for an
-// allowed origin. With no allowed origins it returns next unchanged.
+// 403. Every other request reaches next, with Access-Control-* headers only
+// for an allowed origin. Every response says Vary: Origin, because each one
+// depends on it. With no allowed origins it returns next unchanged.
 func cors(allowed map[string]bool, next http.Handler) http.Handler {
 	if len(allowed) == 0 {
 		return next
@@ -29,6 +30,8 @@ func cors(allowed map[string]bool, next http.Handler) http.Handler {
 		origin := r.Header.Get("Origin")
 		isPreflight := r.Method == http.MethodOptions && origin != "" &&
 			r.Header.Get("Access-Control-Request-Method") != ""
+		h := w.Header()
+		h.Add("Vary", "Origin")
 		if !allowed[origin] {
 			if isPreflight {
 				w.WriteHeader(http.StatusForbidden)
@@ -38,9 +41,7 @@ func cors(allowed map[string]bool, next http.Handler) http.Handler {
 			return
 		}
 
-		h := w.Header()
 		h.Set("Access-Control-Allow-Origin", origin)
-		h.Add("Vary", "Origin")
 		if isPreflight {
 			h.Set("Access-Control-Allow-Methods", "GET, POST")
 			h.Set("Access-Control-Allow-Headers", "Content-Type")

@@ -381,23 +381,20 @@ func requestLogs(t *testing.T, logs *bytes.Buffer) []map[string]any {
 
 func TestEachRequestLogsOneLineWithMethodPathStatusAndDuration(t *testing.T) {
 	tests := []struct {
-		name, method, path, body string
-		status                   int
+		name, method, path string
+		body               io.Reader
+		status             int
 	}{
-		{"a calculation", http.MethodPost, "/api/v1/calculate", `{"operation":"add","operands":[2,3]}`, http.StatusOK},
-		{"a bad request", http.MethodPost, "/api/v1/calculate", `{"operation":"modulo","operands":[2,3]}`,
-			http.StatusBadRequest},
-		{"an unknown path", http.MethodGet, "/api/v1/unknown", "", http.StatusNotFound},
-		{"a panic", http.MethodPost, "/api/v1/calculate", "", http.StatusInternalServerError},
+		{"a calculation", http.MethodPost, "/api/v1/calculate", strings.NewReader(addCalculation), http.StatusOK},
+		{"a bad request", http.MethodPost, "/api/v1/calculate",
+			strings.NewReader(`{"operation":"modulo","operands":[2,3]}`), http.StatusBadRequest},
+		{"an unknown path", http.MethodGet, "/api/v1/unknown", nil, http.StatusNotFound},
+		{"a panic", http.MethodPost, "/api/v1/calculate", panickingBody{"boom"}, http.StatusInternalServerError},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h, logs := newHandlerWithLogs(t)
-			var body io.Reader = strings.NewReader(tt.body)
-			if tt.status == http.StatusInternalServerError {
-				body = panickingBody{"boom"}
-			}
-			h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(tt.method, tt.path, body))
+			h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(tt.method, tt.path, tt.body))
 
 			entries := requestLogs(t, logs)
 			if len(entries) != 1 {
@@ -415,13 +412,21 @@ func TestEachRequestLogsOneLineWithMethodPathStatusAndDuration(t *testing.T) {
 	}
 }
 
-// corsHeaders are every header the CORS middleware may set.
+// corsHeaders are every Access-Control-* header the CORS middleware may set.
 var corsHeaders = []string{
 	"Access-Control-Allow-Origin",
 	"Access-Control-Allow-Methods",
 	"Access-Control-Allow-Headers",
 	"Access-Control-Max-Age",
-	"Vary",
+}
+
+// assertVaryOrigin checks a response that depends on Origin says so, so a
+// shared cache never serves one origin's copy to another.
+func assertVaryOrigin(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	if got := rec.Header().Values("Vary"); len(got) != 1 || got[0] != "Origin" {
+		t.Errorf("Vary = %q, want Origin", got)
+	}
 }
 
 func preflight(t *testing.T, h http.Handler, origin string) *httptest.ResponseRecorder {
@@ -435,9 +440,15 @@ func preflight(t *testing.T, h http.Handler, origin string) *httptest.ResponseRe
 	return rec
 }
 
+// addCalculation and addResult are 2 + 3 sent to the service and its answer.
+const (
+	addCalculation = `{"operation":"add","operands":[2,3]}`
+	addResult      = `{"operation":"add","operands":[2,3],"result":5}`
+)
+
 func calculateFrom(t *testing.T, h http.Handler, origin string) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/calculate", strings.NewReader(`{"operation":"add","operands":[2,3]}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/calculate", strings.NewReader(addCalculation))
 	req.Header.Set("Origin", origin)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -474,13 +485,13 @@ func TestAnAllowedPreflightGets204WithTheCORSHeaders(t *testing.T) {
 		"Access-Control-Allow-Methods": "GET, POST",
 		"Access-Control-Allow-Headers": "Content-Type",
 		"Access-Control-Max-Age":       "600",
-		"Vary":                         "Origin",
 	}
 	for name, value := range want {
 		if got := rec.Header().Get(name); got != value {
 			t.Errorf("%s = %q, want %q", name, got, value)
 		}
 	}
+	assertVaryOrigin(t, rec)
 }
 
 func TestADisallowedPreflightGetsABare403(t *testing.T) {
@@ -493,25 +504,25 @@ func TestADisallowedPreflightGetsABare403(t *testing.T) {
 		t.Errorf("body = %q, want a bare 403", rec.Body.String())
 	}
 	assertNoCORSHeaders(t, rec)
+	assertVaryOrigin(t, rec)
 }
 
 func TestADisallowedSimpleRequestIsServedWithoutCORSHeaders(t *testing.T) {
 	rec := calculateFrom(t, corsHandler(t), "https://evil.example.com")
 
-	assertResponse(t, rec, http.StatusOK, `{"operation":"add","operands":[2,3],"result":5}`)
+	assertResponse(t, rec, http.StatusOK, addResult)
 	assertNoCORSHeaders(t, rec)
+	assertVaryOrigin(t, rec)
 }
 
 func TestAnAllowedSimpleRequestEchoesItsOrigin(t *testing.T) {
 	rec := calculateFrom(t, corsHandler(t), allowedOrigin)
 
-	assertResponse(t, rec, http.StatusOK, `{"operation":"add","operands":[2,3],"result":5}`)
+	assertResponse(t, rec, http.StatusOK, addResult)
 	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != allowedOrigin {
 		t.Errorf("Access-Control-Allow-Origin = %q, want %q", got, allowedOrigin)
 	}
-	if got := rec.Header().Get("Vary"); got != "Origin" {
-		t.Errorf("Vary = %q, want Origin", got)
-	}
+	assertVaryOrigin(t, rec)
 }
 
 func TestCORSIsOffByDefault(t *testing.T) {
@@ -528,8 +539,11 @@ func TestCORSIsOffByDefault(t *testing.T) {
 			})
 			t.Run("a request from another origin gets no CORS headers", func(t *testing.T) {
 				rec := calculateFrom(t, h, allowedOrigin)
-				assertResponse(t, rec, http.StatusOK, `{"operation":"add","operands":[2,3],"result":5}`)
+				assertResponse(t, rec, http.StatusOK, addResult)
 				assertNoCORSHeaders(t, rec)
+				if got := rec.Header().Get("Vary"); got != "" {
+					t.Errorf("Vary = %q, want none while CORS is off", got)
+				}
 			})
 		})
 	}

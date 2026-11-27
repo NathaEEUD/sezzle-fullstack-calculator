@@ -13,17 +13,15 @@ import (
 	"time"
 
 	"github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi"
+	"github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/logging"
 )
 
 func main() {
-	var level slog.Level // info when LOG_LEVEL is unset
-	if v := os.Getenv("LOG_LEVEL"); v != "" {
-		if err := level.UnmarshalText([]byte(v)); err != nil {
-			slog.New(slog.NewJSONHandler(os.Stdout, nil)).Error("invalid LOG_LEVEL", "value", v, "error", err)
-			os.Exit(1)
-		}
+	logger, err := logging.New(os.Stdout, os.Getenv("LOG_LEVEL"))
+	if err != nil {
+		slog.Error("server not started", "error", err)
+		os.Exit(1)
 	}
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 	if err := run(logger); err != nil {
 		logger.Error("server stopped", "error", err)
 		os.Exit(1)
