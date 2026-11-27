@@ -18,6 +18,7 @@ The design stages (agent skills setup through to-tickets) are reused as they wer
 | Build: immediate execution (#5) | [`b319431a`](docs/prompts/2026-11-27-0935-b319431a.md) | [Build: immediate execution](#build-immediate-execution) |
 | Build: full API contract (#8) | [`bca4e311`](docs/prompts/2026-11-27-0940-bca4e311.md) | [Build: full API contract](#build-full-api-contract) |
 | Build: Docker image (#14) | [`383673a0`](docs/prompts/2026-11-27-0941-383673a0.md) | [Build: Docker image](#build-docker-image) |
+| Build: CORS and per-request logging (#13) | [`62ca54f5`](docs/prompts/2026-11-27-1007-62ca54f5.md) | [Build: CORS and per-request logging](#build-cors-and-per-request-logging) |
 
 ## Setup: prompt capture
 
@@ -201,4 +202,26 @@ log this session in PROMPTS.md and open a PR
 
 ````text
 resolve conflicts
+````
+
+## Build: CORS and per-request logging
+
+Ran Matt Pocock's `implement` on [#13](https://github.com/NathaEEUD/sezzle-fullstack-calculator/issues/13) in a new branch, cut from `origin/main` after #8 and #14 had merged. The ticket is `ready-for-agent`, so the seams came from `CODING_STANDARDS.md` with no check-in: `httptest` against the real `NewHandler`, with the logger writing to a buffer, and one `@issue-13` Playwright test. The log line went red, then green. Its first table row tried divide by zero and got a 500, not a 422, because maths errors don't map to 422 yet. That is #7's work, so the row became a bad request. The allowed preflight went red, then green. The disallowed and off-by-default cases passed on their first run, because the middleware already held those branches. Breaking each branch on purpose made them fail. The e2e test has a page on `127.0.0.1` send a calculation to `localhost`, the same server on another origin. It failed when the binary allowed that origin and passed with CORS off. The whole suite also passed against the Docker image (`make docker-e2e`), which shows the image doesn't set `CORS_ALLOWED_ORIGINS`.
+
+The `code-review` skill then ran its Standards and Spec reviews in parallel. Their fixes landed in a second commit:
+
+- `LOG_LEVEL` parsing sat untested in `main.go`, and now lives in `internal/logging` with a test per level;
+- a disallowed origin's response had no `Vary: Origin`, so a shared cache could serve it to an allowed origin; every response now carries it while CORS is on;
+- the tests repeated the 2 + 3 calculation, and the log test chose its request body from the expected status.
+
+Three findings were left as they are. Request lines log at INFO, so `LOG_LEVEL=warn` turns them off. An allowed preflight gets 204 on any path, because CORS runs before routing. And `WithCORSAllowedOrigins` takes the raw env value, the way `WithStaticDir` does.
+
+The raw log for this session also holds the two reviewers' reports, at 10:12. The hook captured them because they reached the session as messages, but nobody typed them. The hook wrote the log into the main checkout, not the worktree, so it was copied here.
+
+````text
+/mattpocock-skills:implement 13 in a new branch
+````
+
+````text
+Log and open PR
 ````
