@@ -27,10 +27,13 @@ export function createCalculatorClient(fetch: typeof globalThis.fetch): Calculat
         if (response.status === 200 && hasNumericResult(body)) {
           return { kind: 'ok', result: body.result }
         }
-        return {
-          kind: 'unavailable',
-          message: envelopeMessage(body) ?? SERVICE_UNAVAILABLE_MESSAGE,
+        const message = envelopeMessage(body)
+        // The kind comes from the status, never from `code` (ADR-0004). A 422 with no
+        // message has nothing to show in the display, so it counts as unavailable.
+        if (response.status === 422 && message !== undefined) {
+          return { kind: 'maths_error', message }
         }
+        return { kind: 'unavailable', message: message ?? SERVICE_UNAVAILABLE_MESSAGE }
       } catch {
         // Network failure, timeout or a body that isn't JSON: the service is unavailable.
         return { kind: 'unavailable', message: SERVICE_UNAVAILABLE_MESSAGE }

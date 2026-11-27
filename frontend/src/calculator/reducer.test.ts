@@ -32,6 +32,10 @@ const ok = (result: number): CalculatorEvent => ({
   type: 'outcome',
   outcome: { kind: 'ok', result },
 })
+const mathsError = (message: string): CalculatorEvent => ({
+  type: 'outcome',
+  outcome: { kind: 'maths_error', message },
+})
 const unavailable = (message = SERVICE_UNAVAILABLE_MESSAGE): CalculatorEvent => ({
   type: 'outcome',
   outcome: { kind: 'unavailable', message },
@@ -144,6 +148,77 @@ describe('calculatorReducer', () => {
 
       expect(state.serviceAlert).toBeNull()
       expect(displayText(state)).toBe('5')
+    })
+  })
+
+  describe('maths error', () => {
+    const divideByZero = () =>
+      press(digit('5'), divide, digit('0'), equals, mathsError('Cannot divide by zero'))
+
+    it("shows the service's message in the display", () => {
+      expect(displayText(divideByZero())).toBe('Cannot divide by zero')
+    })
+
+    it('resets the calculation chain', () => {
+      const state = divideByZero()
+
+      expect(state).toEqual({ ...initialState, mathsError: 'Cannot divide by zero' })
+    })
+
+    it('drops the operation whose operator key sent the calculation', () => {
+      const state = press(digit('5'), divide, digit('0'), add, mathsError('Cannot divide by zero'))
+
+      expect(state.pending).toBeNull()
+      expect(displayText(state)).toBe('Cannot divide by zero')
+    })
+
+    it('starts a new entry when a digit key follows', () => {
+      const state = calculatorReducer(divideByZero(), digit('7'))
+
+      expect(state.mathsError).toBeNull()
+      expect(displayText(state)).toBe('7')
+    })
+
+    it('starts a new entry when the decimal point key follows', () => {
+      expect(displayText(calculatorReducer(divideByZero(), decimalPoint))).toBe('0.')
+    })
+
+    it('resets on clear', () => {
+      expect(calculatorReducer(divideByZero(), clear)).toEqual(initialState)
+    })
+
+    it.each([
+      ['an operator key', add],
+      ['equals', equals],
+      ['delete last digit', deleteLastDigit],
+    ])('ignores %s while the maths error is shown', (_, key) => {
+      const state = divideByZero()
+
+      expect(calculatorReducer(state, key)).toBe(state)
+    })
+
+    it('evaluates a new calculation typed after the maths error', () => {
+      const state = [digit('6'), add, digit('2'), equals, ok(8)].reduce(
+        calculatorReducer,
+        divideByZero(),
+      )
+
+      expect(displayText(state)).toBe('8')
+    })
+
+    it('clears the service alert when a retried calculation comes back as a maths error', () => {
+      const state = press(
+        digit('5'),
+        divide,
+        digit('0'),
+        equals,
+        unavailable(),
+        equals,
+        mathsError('Cannot divide by zero'),
+      )
+
+      expect(state.serviceAlert).toBeNull()
+      expect(displayText(state)).toBe('Cannot divide by zero')
     })
   })
 

@@ -21,6 +21,7 @@ The design stages (agent skills setup through to-tickets) are reused as they wer
 | Build: entry editing (#6) | [`a21f9bde`](docs/prompts/2026-11-27-1006-a21f9bde.md) | [Build: entry editing](#build-entry-editing) |
 | Build: service unavailable (#9) | [`6289e825`](docs/prompts/2026-11-27-1006-6289e825.md) | [Build: service unavailable](#build-service-unavailable) |
 | Build: CORS and per-request logging (#13) | [`62ca54f5`](docs/prompts/2026-11-27-1007-62ca54f5.md) | [Build: CORS and per-request logging](#build-cors-and-per-request-logging) |
+| Build: maths errors (#7) | [`58aa8b9d`](docs/prompts/2026-11-27-1030-58aa8b9d.md) | [Build: maths errors](#build-maths-errors) |
 
 ## Setup: prompt capture
 
@@ -304,4 +305,35 @@ Log and open PR
 
 ````text
 PR #22 (https://github.com/NathaEEUD/sezzle-fullstack-calculator/pull/22) has merge conflicts with its base branch. Merge the base branch in, resolve the conflicts, and push.
+````
+
+## Build: maths errors
+
+Ran Matt Pocock's `implement` on [#7](https://github.com/NathaEEUD/sezzle-fullstack-calculator/issues/7) in a new branch, cut from `origin/main` after #13 had merged. The ticket is `ready-for-agent`, so the `tdd` seams came from the issue's acceptance criteria and `CODING_STANDARDS.md` with no check-in: `calc` table tests, `httptest` against the real `NewHandler`, a fake `fetch` for the client, plain reducer tests, and one `@issue-7` Playwright test on Chromium and 360 px.
+
+Each slice went red, then green:
+
+- `calc`: x ÷ 0 (and ÷ −0) is `DIVISION_BY_ZERO`; one check on every result turns ±Inf into `OVERFLOW`, both with sentinels for `errors.Is`;
+- `httpapi`: both codes answer 422 with their exact messages. The old test that got a 500 from `1e308 + 1e308` became the `OVERFLOW` row;
+- the client returns a `maths_error` for a 422 with a message, whatever the `code`;
+- the reducer shows the message in the display and resets the calculation chain; a digit or the decimal point starts a new entry and clear resets.
+
+The e2e test passed on its first run because the unit slices had already made it true. While the maths error shows, operator keys, equals and delete last digit are ignored: the issue only names digit and clear, and ignoring the rest avoids a surprise `0 + …`. At 320 px the message wraps onto two lines.
+
+The `code-review` skill then ran its Standards and Spec reviews in parallel. Neither found a blocker. Their fixes landed in a second commit:
+
+- `statusFor` looks calc codes up in a `calcStatus` table, like `requestStatus`, instead of a switch;
+- the wrapper for operations that can't fail is named `alwaysReal`;
+- the client comment now says a 422 with no message counts as service unavailable, since there is nothing to show in the display.
+
+Two findings were left as they are. The finiteness check tests only ±Inf: no current operation can produce NaN, so a NaN branch would be untested; #10 should grow the same check. And with ±Inf stopped in `calc`, nothing reaches `writeJSON`'s encode-failure path through the API any more, so that defensive 500 has no test.
+
+The raw log for this session also holds the two reviewers' reports, at 10:34 and 10:35. The hook captured them because they reached the session as messages, but nobody typed them. The hook wrote the log into the main checkout, not the worktree, so it was copied here.
+
+````text
+/mattpocock-skills:implement 7 in a new branch
+````
+
+````text
+Log and open PR
 ````

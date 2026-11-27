@@ -46,6 +46,27 @@ describe('createCalculatorClient', () => {
   })
 
   it.each([
+    ['DIVISION_BY_ZERO', 'Cannot divide by zero'],
+    ['OVERFLOW', 'Result too large'],
+  ])("returns a maths error with the service's message for a 422 %s", async (code, message) => {
+    const { fetch } = fakeFetch(() => json(422, { error: { code, message } }))
+
+    const outcome = await createCalculatorClient(fetch).calculate(twoPlusThree)
+
+    expect(outcome).toEqual({ kind: 'maths_error', message })
+  })
+
+  it('chooses a maths error from the 422 status alone, whatever the code', async () => {
+    const { fetch } = fakeFetch(() =>
+      json(422, { error: { code: 'SOME_FUTURE_CODE', message: 'Not a real number' } }),
+    )
+
+    const outcome = await createCalculatorClient(fetch).calculate(twoPlusThree)
+
+    expect(outcome).toEqual({ kind: 'maths_error', message: 'Not a real number' })
+  })
+
+  it.each([
     [400, 'INVALID_OPERAND_COUNT', 'expected 2 operands for add, got 1'],
     [500, 'INTERNAL_ERROR', 'internal error'],
   ])(
@@ -68,6 +89,7 @@ describe('createCalculatorClient', () => {
     ],
     ['a 200 body is not JSON', () => Promise.resolve(new Response('<html>', { status: 200 }))],
     ['a 200 body has no numeric result', () => json(200, { result: 'five' })],
+    ['a 422 has no envelope message', () => json(422, {})],
   ])('reports service unavailable and never throws when %s', async (_, respond) => {
     const { fetch } = fakeFetch(respond)
 

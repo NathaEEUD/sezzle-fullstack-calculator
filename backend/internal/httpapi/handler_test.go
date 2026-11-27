@@ -88,11 +88,23 @@ func TestCalculateAnswersARejectedCalculationWithABadRequest(t *testing.T) {
 	}
 }
 
-func TestCalculateNeverAnswersAnEmpty200WhenTheResultCannotBeEncoded(t *testing.T) {
-	rec := do(t, newHandler(t), http.MethodPost, "/api/v1/calculate", `{"operation":"add","operands":[1e308,1e308]}`)
-
-	assertResponse(t, rec, http.StatusInternalServerError,
-		`{"error":{"code":"INTERNAL_ERROR","message":"internal error"}}`)
+func TestCalculateAnswersAMathsErrorWith422(t *testing.T) {
+	tests := []struct {
+		name, body, want string
+	}{
+		{"divide by zero", `{"operation":"divide","operands":[5,0]}`,
+			`{"error":{"code":"DIVISION_BY_ZERO","message":"Cannot divide by zero"}}`},
+		{"result too large", `{"operation":"add","operands":[1e308,1e308]}`,
+			`{"error":{"code":"OVERFLOW","message":"Result too large"}}`},
+		{"result too large and negative", `{"operation":"multiply","operands":[-1e200,1e200]}`,
+			`{"error":{"code":"OVERFLOW","message":"Result too large"}}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := do(t, newHandler(t), http.MethodPost, "/api/v1/calculate", tt.body)
+			assertResponse(t, rec, http.StatusUnprocessableEntity, tt.want)
+		})
+	}
 }
 
 func TestHealthzReportsOK(t *testing.T) {

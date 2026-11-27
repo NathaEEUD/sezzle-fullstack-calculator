@@ -67,6 +67,22 @@ func TestEvaluateRejectsACalculationWithACalcError(t *testing.T) {
 			calc.CodeUnknownOperation, calc.ErrUnknownOperation, "operation is required"},
 		{"wrong operand count", "add", []float64{2},
 			calc.CodeInvalidOperandCount, calc.ErrInvalidOperandCount, "expected 2 operands for add, got 1"},
+		{"divide by zero", "divide", []float64{5, 0},
+			calc.CodeDivisionByZero, calc.ErrDivisionByZero, "Cannot divide by zero"},
+		{"divide zero by zero", "divide", []float64{0, 0},
+			calc.CodeDivisionByZero, calc.ErrDivisionByZero, "Cannot divide by zero"},
+		{"divide by -0", "divide", []float64{5, negativeZero},
+			calc.CodeDivisionByZero, calc.ErrDivisionByZero, "Cannot divide by zero"},
+		{"add overflows to +Inf", "add", []float64{1e308, 1e308},
+			calc.CodeOverflow, calc.ErrOverflow, "Result too large"},
+		{"subtract overflows to -Inf", "subtract", []float64{-1e308, 1e308},
+			calc.CodeOverflow, calc.ErrOverflow, "Result too large"},
+		{"multiply overflows to +Inf", "multiply", []float64{1e200, 1e200},
+			calc.CodeOverflow, calc.ErrOverflow, "Result too large"},
+		{"multiply overflows to -Inf", "multiply", []float64{-1e200, 1e200},
+			calc.CodeOverflow, calc.ErrOverflow, "Result too large"},
+		{"divide overflows to +Inf", "divide", []float64{1e300, 1e-300},
+			calc.CodeOverflow, calc.ErrOverflow, "Result too large"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -58,6 +58,15 @@ var requestStatus = map[string]int{
 	codeMethodNotAllowed: http.StatusMethodNotAllowed,
 }
 
+// calcStatus is the status of each calc.Error code: a bad request or a maths
+// error.
+var calcStatus = map[calc.Code]int{
+	calc.CodeUnknownOperation:    http.StatusBadRequest,
+	calc.CodeInvalidOperandCount: http.StatusBadRequest,
+	calc.CodeDivisionByZero:      http.StatusUnprocessableEntity,
+	calc.CodeOverflow:            http.StatusUnprocessableEntity,
+}
+
 // statusFor is the one mapping from an error to its status and envelope.
 func statusFor(err error) (int, envelopeError) {
 	var reqErr *requestError
@@ -66,9 +75,8 @@ func statusFor(err error) (int, envelopeError) {
 	}
 	var calcErr *calc.Error
 	if errors.As(err, &calcErr) {
-		switch calcErr.Code {
-		case calc.CodeUnknownOperation, calc.CodeInvalidOperandCount:
-			return http.StatusBadRequest, envelopeError{Code: string(calcErr.Code), Message: calcErr.Message}
+		if status, ok := calcStatus[calcErr.Code]; ok {
+			return status, envelopeError{Code: string(calcErr.Code), Message: calcErr.Message}
 		}
 	}
 	return http.StatusInternalServerError, envelopeError{Code: codeInternalError, Message: "internal error"}

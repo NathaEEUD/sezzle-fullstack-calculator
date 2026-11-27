@@ -19,6 +19,8 @@ export type CalculatorState = {
   lastCalculation: { operation: OperationName; right: number } | null
   /** The service alert's message after service unavailable, until the next keypress. */
   serviceAlert: string | null
+  /** The service's maths error message, which replaces the display until a digit, decimal point or clear. */
+  mathsError: string | null
 }
 
 export type KeyEvent =
@@ -39,6 +41,7 @@ export const initialState: CalculatorState = {
   nextOperation: null,
   lastCalculation: null,
   serviceAlert: null,
+  mathsError: null,
 }
 
 /** An entry stops accepting digits once it holds this many significant digits. */
@@ -49,8 +52,21 @@ export function calculatorReducer(state: CalculatorState, event: CalculatorEvent
   if (event.type === 'outcome') return applyOutcome(state, event.outcome)
   // Keys are ignored while a calculation is in flight.
   if (state.calculation !== null) return state
+  if (state.mathsError !== null) return recoverFromMathsError(state, event)
   // Any keypress dismisses the service alert.
   return applyKey(state.serviceAlert === null ? state : { ...state, serviceAlert: null }, event)
+}
+
+/** After a maths error the chain is gone: a digit or decimal point starts a new entry, clear resets, and every other key is ignored. */
+function recoverFromMathsError(state: CalculatorState, event: KeyEvent): CalculatorState {
+  switch (event.type) {
+    case 'digit':
+    case 'decimalPoint':
+    case 'clear':
+      return applyKey(initialState, event)
+    default:
+      return state
+  }
 }
 
 function applyKey(state: CalculatorState, event: KeyEvent): CalculatorState {
@@ -102,12 +118,14 @@ function applyOutcome(state: CalculatorState, outcome: Outcome): CalculatorState
         nextOperation: null,
         lastCalculation: { operation: calculation.operation, right: calculation.operands[1] },
         serviceAlert: null,
+        mathsError: null,
       }
     case 'unavailable':
       // The state from before the keypress, so the person can press the key again.
       return { ...state, calculation: null, nextOperation: null, serviceAlert: outcome.message }
     case 'maths_error':
-      return { ...state, calculation: null, nextOperation: null }
+      // The message replaces the display and the calculation chain is reset.
+      return { ...initialState, mathsError: outcome.message }
   }
 }
 
@@ -129,6 +147,7 @@ function pendingCalculation(pending: PendingOperation, entry: string): Calculati
 
 /** What the display shows for a state. */
 export function displayText(state: CalculatorState): string {
+  if (state.mathsError !== null) return state.mathsError
   if (state.entry !== '') return state.entry
   return formatForDisplay(currentNumber(state))
 }
