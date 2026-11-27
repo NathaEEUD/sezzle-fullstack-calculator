@@ -12,7 +12,10 @@ type operation struct {
 // registry holds every operation the service can evaluate. Adding an
 // operation is one entry here and one table-test row.
 var registry = map[string]operation{
-	"add": {arity: 2, apply: func(o []float64) float64 { return o[0] + o[1] }},
+	"add":      {arity: 2, apply: func(o []float64) float64 { return o[0] + o[1] }},
+	"subtract": {arity: 2, apply: func(o []float64) float64 { return o[0] - o[1] }},
+	"multiply": {arity: 2, apply: func(o []float64) float64 { return o[0] * o[1] }},
+	"divide":   {arity: 2, apply: func(o []float64) float64 { return o[0] / o[1] }},
 }
 
 // Evaluate applies the named operation to its operands and returns the raw
