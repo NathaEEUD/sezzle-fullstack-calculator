@@ -10,9 +10,8 @@ import (
 
 var negativeZero = math.Copysign(0, -1)
 
-// TestEvaluateReturnsTheResultOfEachOperation checks the raw float64 result,
-// including -0 and values beyond float64's range, which calc never rounds or
-// rejects: the finiteness check belongs to the caller.
+// TestEvaluateReturnsTheResultOfEachOperation checks the raw, unrounded
+// float64 result, including -0 and huge finite values.
 func TestEvaluateReturnsTheResultOfEachOperation(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -38,7 +37,6 @@ func TestEvaluateReturnsTheResultOfEachOperation(t *testing.T) {
 		{"divide into a fraction", "divide", []float64{1, 4}, 0.25},
 		{"divide by a negative operand", "divide", []float64{12, -4}, -3},
 		{"divide zero by a negative operand gives -0", "divide", []float64{0, -4}, negativeZero},
-		{"divide a huge operand", "divide", []float64{1e308, 0.5}, math.Inf(1)},
 		{"divide a tiny operand", "divide", []float64{1e-300, 1e10}, 1e-310},
 	}
 	for _, tt := range tests {

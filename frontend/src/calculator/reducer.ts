@@ -1,13 +1,16 @@
 import { formatForDisplay } from './format'
 import type { Calculation, OperationName, Outcome } from './operations'
 
+/** A binary operation waiting for its right operand. */
+export type PendingOperation = { operation: OperationName; left: number }
+
 export type CalculatorState = {
   /** The number being typed, or '' when nothing is being typed. */
   entry: string
   /** The latest result, at full precision. */
   result: number | null
   /** The binary operation waiting for its right operand. */
-  pending: { operation: OperationName; left: number } | null
+  pending: PendingOperation | null
   /** The calculation the service must evaluate before the next key, if any. */
   calculation: Calculation | null
   /** The operation whose operator key sent the calculation; it becomes the pending operation once the result arrives. */
@@ -78,10 +81,7 @@ function repeatedEquals(state: CalculatorState): CalculatorState {
   return { ...state, calculation: { operation, operands: [currentNumber(state), right] } }
 }
 
-function pendingCalculation(
-  pending: NonNullable<CalculatorState['pending']>,
-  entry: string,
-): Calculation {
+function pendingCalculation(pending: PendingOperation, entry: string): Calculation {
   return { operation: pending.operation, operands: [pending.left, Number(entry)] }
 }
 

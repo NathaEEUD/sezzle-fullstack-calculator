@@ -106,7 +106,7 @@ describe('calculatorReducer', () => {
       expect(displayText(state)).toBe('0.666666666667')
     })
 
-    it('chains the full-precision result, not the displayed one', () => {
+    it('uses the full-precision result in the next calculation, not the displayed one', () => {
       const state = press(digit('2'), divide, digit('3'), equals, ok(2 / 3), multiply, digit('3'))
 
       expect(calculatorReducer(state, equals).calculation).toEqual({
@@ -257,7 +257,7 @@ describe('calculatorReducer', () => {
       expect(displayText(state)).toBe('5')
     })
 
-    it('chains the result into the next calculation', () => {
+    it('uses the result as the left operand of the next calculation', () => {
       const state = [multiply, digit('4'), equals].reduce(calculatorReducer, afterResult())
 
       expect(state.calculation).toEqual({ operation: 'multiply', operands: [5, 4] })

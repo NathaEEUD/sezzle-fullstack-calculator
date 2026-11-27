@@ -7,9 +7,9 @@ const EXPONENT_BELOW = 1e-9
  * zeros, exponent notation at ≥ 1e12 or < 1e-9, and −0 as 0. Only the display
  * uses it; state keeps the full-precision result.
  */
-export function formatForDisplay(value: number): string {
-  if (value === 0) return '0'
-  const rounded = Number(value.toPrecision(SIGNIFICANT_DIGITS))
+export function formatForDisplay(result: number): string {
+  if (result === 0) return '0'
+  const rounded = Number(result.toPrecision(SIGNIFICANT_DIGITS))
   const magnitude = Math.abs(rounded)
   if (magnitude >= EXPONENT_AT_OR_ABOVE || magnitude < EXPONENT_BELOW) {
     return rounded.toExponential()

@@ -31,7 +31,7 @@ describe('formatForDisplay', () => {
     ['just under 1e-9', 9.99e-10, '9.99e-10'],
     ['a tiny result', 1e-10, '1e-10'],
     ['a tiny negative result', -2.5e-15, '-2.5e-15'],
-  ])('%s', (_, value, expected) => {
-    expect(formatForDisplay(value)).toBe(expected)
+  ])('%s', (_, result, expected) => {
+    expect(formatForDisplay(result)).toBe(expected)
   })
 })
