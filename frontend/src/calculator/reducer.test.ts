@@ -13,6 +13,11 @@ function press(...events: CalculatorEvent[]): CalculatorState {
   return events.reduce(calculatorReducer, initialState)
 }
 
+/** Presses the digit and decimal point keys that spell out an entry, such as '12.5'. */
+function typeEntry(keys: string): CalculatorState {
+  return press(...[...keys].map((key) => (key === '.' ? decimalPoint : digit(key))))
+}
+
 const digit = (d: string): CalculatorEvent => ({ type: 'digit', digit: d })
 const operator = (operation: OperationName): CalculatorEvent => ({ type: 'operator', operation })
 const add = operator('add')
@@ -269,31 +274,26 @@ describe('calculatorReducer', () => {
     })
 
     describe('15-significant-digit limit', () => {
-      const type = (keys: string, from = initialState) =>
-        [...keys]
-          .map((key) => (key === '.' ? decimalPoint : digit(key)))
-          .reduce(calculatorReducer, from)
-
       it('accepts 15 significant digits', () => {
-        expect(displayText(type('123456789012345'))).toBe('123456789012345')
+        expect(displayText(typeEntry('123456789012345'))).toBe('123456789012345')
       })
 
       it('ignores a 16th significant digit', () => {
-        const state = type('123456789012345')
+        const state = typeEntry('123456789012345')
 
         expect(calculatorReducer(state, digit('6'))).toBe(state)
       })
 
       it('does not count the decimal point', () => {
-        expect(displayText(type('1234567890.123456'))).toBe('1234567890.12345')
+        expect(displayText(typeEntry('1234567890.123456'))).toBe('1234567890.12345')
       })
 
       it('does not count zeros before the first non-zero digit', () => {
-        expect(displayText(type('0.00123456789012345'))).toBe('0.00123456789012345')
+        expect(displayText(typeEntry('0.00123456789012345'))).toBe('0.00123456789012345')
       })
 
       it('still accepts the decimal point at the limit', () => {
-        expect(displayText(type('123456789012345.'))).toBe('123456789012345.')
+        expect(displayText(typeEntry('123456789012345.'))).toBe('123456789012345.')
       })
     })
   })

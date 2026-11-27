@@ -5,7 +5,7 @@ import type { Calculation, OperationName, Outcome } from './operations'
 export type PendingOperation = { operation: OperationName; left: number }
 
 export type CalculatorState = {
-  /** The number being typed, or '' when nothing is being typed. */
+  /** The number being typed, or '' when nothing is being typed; '0' is a typed zero and makes the operand 0. */
   entry: string
   /** The latest result, at full precision. */
   result: number | null
