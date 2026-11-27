@@ -98,14 +98,14 @@ describe('calculatorReducer', () => {
       const before = press(digit('2'), add, digit('3'))
       const state = [equals, unavailable()].reduce(calculatorReducer, before)
 
-      expect(state).toEqual({ ...before, alert: SERVICE_UNAVAILABLE_MESSAGE })
+      expect(state).toEqual({ ...before, serviceAlert: SERVICE_UNAVAILABLE_MESSAGE })
       expect(displayText(state)).toBe('3')
     })
 
     it("shows the service's message in the service alert", () => {
       const state = press(digit('2'), add, digit('3'), equals, unavailable('internal error'))
 
-      expect(state.alert).toBe('internal error')
+      expect(state.serviceAlert).toBe('internal error')
     })
 
     it.each([
@@ -118,7 +118,7 @@ describe('calculatorReducer', () => {
         key,
       )
 
-      expect(state.alert).toBeNull()
+      expect(state.serviceAlert).toBeNull()
       expect(displayText(state)).toBe(display)
     })
 
@@ -131,7 +131,7 @@ describe('calculatorReducer', () => {
     it('clears the service alert when the retried calculation comes back', () => {
       const state = press(digit('2'), add, digit('3'), equals, unavailable(), equals, ok(5))
 
-      expect(state.alert).toBeNull()
+      expect(state.serviceAlert).toBeNull()
       expect(displayText(state)).toBe('5')
     })
   })
@@ -210,7 +210,7 @@ describe('calculatorReducer', () => {
       const before = press(digit('2'), add, digit('3'))
       const state = [multiply, unavailable()].reduce(calculatorReducer, before)
 
-      expect(state).toEqual({ ...before, alert: SERVICE_UNAVAILABLE_MESSAGE })
+      expect(state).toEqual({ ...before, serviceAlert: SERVICE_UNAVAILABLE_MESSAGE })
     })
   })
 

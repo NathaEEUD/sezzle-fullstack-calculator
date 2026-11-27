@@ -18,7 +18,7 @@ export type CalculatorState = {
   /** The most recently evaluated binary operation with its right operand, for repeated equals. */
   lastCalculation: { operation: OperationName; right: number } | null
   /** The service alert's message after service unavailable, until the next keypress. */
-  alert: string | null
+  serviceAlert: string | null
 }
 
 export type KeyEvent =
@@ -35,7 +35,7 @@ export const initialState: CalculatorState = {
   calculation: null,
   nextOperation: null,
   lastCalculation: null,
-  alert: null,
+  serviceAlert: null,
 }
 
 /** Every keypad rule. It never does arithmetic: results arrive as outcome events. */
@@ -44,7 +44,7 @@ export function calculatorReducer(state: CalculatorState, event: CalculatorEvent
   // Keys are ignored while a calculation is in flight.
   if (state.calculation !== null) return state
   // Any keypress dismisses the service alert.
-  return applyKey(state.alert === null ? state : { ...state, alert: null }, event)
+  return applyKey(state.serviceAlert === null ? state : { ...state, serviceAlert: null }, event)
 }
 
 function applyKey(state: CalculatorState, event: KeyEvent): CalculatorState {
@@ -86,11 +86,11 @@ function applyOutcome(state: CalculatorState, outcome: Outcome): CalculatorState
         calculation: null,
         nextOperation: null,
         lastCalculation: { operation: calculation.operation, right: calculation.operands[1] },
-        alert: null,
+        serviceAlert: null,
       }
     case 'unavailable':
       // The state from before the keypress, so the person can press the key again.
-      return { ...state, calculation: null, nextOperation: null, alert: outcome.message }
+      return { ...state, calculation: null, nextOperation: null, serviceAlert: outcome.message }
     case 'maths_error':
       return { ...state, calculation: null, nextOperation: null }
   }

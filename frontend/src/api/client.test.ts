@@ -61,8 +61,9 @@ describe('createCalculatorClient', () => {
 
   it.each([
     ['the network fails', () => Promise.reject(new TypeError('Failed to fetch'))],
+    ['the service faults with no envelope', () => json(500, {})],
     [
-      'the service faults with no envelope',
+      'the service faults with an empty body',
       () => Promise.resolve(new Response('', { status: 502 })),
     ],
     ['a 200 body is not JSON', () => Promise.resolve(new Response('<html>', { status: 200 }))],

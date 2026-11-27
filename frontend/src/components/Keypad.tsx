@@ -1,5 +1,5 @@
 import type { OperationName } from '../calculator/operations'
-import type { KeyEvent } from '../calculator/useCalculator'
+import type { KeyEvent } from '../calculator/reducer'
 import styles from './Keypad.module.css'
 
 type Key = { label: string; name: string; event: KeyEvent; wide?: boolean }
