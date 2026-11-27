@@ -22,6 +22,7 @@ The design stages (agent skills setup through to-tickets) are reused as they wer
 | Build: service unavailable (#9) | [`6289e825`](docs/prompts/2026-11-27-1006-6289e825.md) | [Build: service unavailable](#build-service-unavailable) |
 | Build: CORS and per-request logging (#13) | [`62ca54f5`](docs/prompts/2026-11-27-1007-62ca54f5.md) | [Build: CORS and per-request logging](#build-cors-and-per-request-logging) |
 | Build: maths errors (#7) | [`58aa8b9d`](docs/prompts/2026-11-27-1030-58aa8b9d.md) | [Build: maths errors](#build-maths-errors) |
+| Build: power and square root (#10) | [`09f71fd8`](docs/prompts/2026-11-27-1046-09f71fd8.md) | [Build: power and square root](#build-power-and-square-root) |
 
 ## Setup: prompt capture
 
@@ -336,4 +337,40 @@ The raw log for this session also holds the two reviewers' reports, at 10:34 and
 
 ````text
 Log and open PR
+````
+
+## Build: power and square root
+
+Ran Matt Pocock's `implement` on [#10](https://github.com/NathaEEUD/sezzle-fullstack-calculator/issues/10) in a new branch, cut from `origin/main` after #7 had merged. The ticket is `ready-for-agent`, so the `tdd` seams came from the issue's acceptance criteria and `CODING_STANDARDS.md` with no check-in: `calc` table tests, `httptest` against the real `NewHandler`, plain reducer tests, Testing Library component tests with a fake client, and `@issue-10` Playwright tests on Chromium and 360 px. Keyboard bindings, `^` included, stay with #12.
+
+Each slice went red, then green:
+
+- `calc`: `power` and `sqrt` join the registry. The finiteness check now turns NaN into `INVALID_OPERAND` "Not a real number" (√ of a negative, a negative base with a non-integer exponent), as #7's log asked. 0 (or −0) to a negative power is caught before `math.Pow`, which would give ±Inf and read as an overflow, and answers `DIVISION_BY_ZERO`. A huge-result row first used `10^308` and failed, because `math.Pow` is off by one ulp there. It now uses `2^1023`, which is exact;
+- `httpapi`: `INVALID_OPERAND` maps to 422. That is one line in `httpapi` for the new code, not for the operations;
+- reducer: xʸ is a pending binary operation. √ is a new `unaryOperator` event that sends its calculation at once, and its result becomes the entry (`entry` is now `string | number`), so `2 + 9 √ =` gives 5. A digit or decimal point replaces that entry, delete last digit leaves it, and the last calculation for repeated equals is kept. The power tests passed on their first run, because binary operator keys were already generic;
+- components: the "power" and "square root" keys join the top row next to C and ⌫, which are no longer two columns wide, and the unused `wide` option was removed.
+
+The e2e tests were written after the code, so they were never seen failing.
+
+The `code-review` skill then ran its Standards and Spec reviews in parallel. Neither found a hard violation or a missing requirement. Their fixes landed in a second commit:
+
+- `divide` and `power` share one constructor for the "Cannot divide by zero" error;
+- the `calc` test rows say "square root", the glossary term, not `sqrt`.
+
+These findings were left as they are:
+
+- `entry: string | number` stands a √ result in for the entry with a type check instead of its own field, because the issue says the result "becomes the entry";
+- `isUnary` reads the operand count rather than the arity;
+- the tests repeat their click-each-key loops.
+
+Two cases the issue doesn't cover behave like this. `2 + √` with nothing typed takes the square root of the left operand. `2 + 3 = √ =` doesn't repeat `+ 3`, the same as `2 + 3 = 9 =`.
+
+The raw log for this session also holds the two reviewers' reports, at 10:52. The hook captured them because they reached the session as messages, but nobody typed them. The hook wrote the log into the main checkout, not the worktree, so it was copied here.
+
+````text
+/mattpocock-skills:implement 10 in a new branch
+````
+
+````text
+log this session in PROMPTS.md and open a PR
 ````
