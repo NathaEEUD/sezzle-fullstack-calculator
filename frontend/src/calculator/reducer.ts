@@ -17,13 +17,16 @@ export type CalculatorState = {
   nextOperation: OperationName | null
   /** The most recently evaluated binary operation with its right operand, for repeated equals. */
   lastCalculation: { operation: OperationName; right: number } | null
+  /** The service alert's message after service unavailable, until the next keypress. */
+  alert: string | null
 }
 
-export type CalculatorEvent =
+export type KeyEvent =
   | { type: 'digit'; digit: string }
   | { type: 'operator'; operation: OperationName }
   | { type: 'equals' }
-  | { type: 'outcome'; outcome: Outcome }
+
+export type CalculatorEvent = KeyEvent | { type: 'outcome'; outcome: Outcome }
 
 export const initialState: CalculatorState = {
   entry: '',
@@ -32,10 +35,19 @@ export const initialState: CalculatorState = {
   calculation: null,
   nextOperation: null,
   lastCalculation: null,
+  alert: null,
 }
 
 /** Every keypad rule. It never does arithmetic: results arrive as outcome events. */
 export function calculatorReducer(state: CalculatorState, event: CalculatorEvent): CalculatorState {
+  if (event.type === 'outcome') return applyOutcome(state, event.outcome)
+  // Keys are ignored while a calculation is in flight.
+  if (state.calculation !== null) return state
+  // Any keypress dismisses the service alert.
+  return applyKey(state.alert === null ? state : { ...state, alert: null }, event)
+}
+
+function applyKey(state: CalculatorState, event: KeyEvent): CalculatorState {
   switch (event.type) {
     case 'digit':
       return { ...state, entry: state.entry + event.digit }
@@ -56,21 +68,31 @@ export function calculatorReducer(state: CalculatorState, event: CalculatorEvent
       if (state.pending === null) return repeatedEquals(state)
       if (state.entry === '') return state
       return { ...state, calculation: pendingCalculation(state.pending, state.entry) }
-    case 'outcome': {
-      const { calculation } = state
-      if (calculation === null) return state
-      if (event.outcome.kind !== 'ok') return { ...state, calculation: null, nextOperation: null }
-      const result = event.outcome.result
+  }
+}
+
+function applyOutcome(state: CalculatorState, outcome: Outcome): CalculatorState {
+  const { calculation } = state
+  if (calculation === null) return state
+  switch (outcome.kind) {
+    case 'ok':
       return {
         entry: '',
-        result,
+        result: outcome.result,
         pending:
-          state.nextOperation === null ? null : { operation: state.nextOperation, left: result },
+          state.nextOperation === null
+            ? null
+            : { operation: state.nextOperation, left: outcome.result },
         calculation: null,
         nextOperation: null,
         lastCalculation: { operation: calculation.operation, right: calculation.operands[1] },
+        alert: null,
       }
-    }
+    case 'unavailable':
+      // The state from before the keypress, so the person can press the key again.
+      return { ...state, calculation: null, nextOperation: null, alert: outcome.message }
+    case 'maths_error':
+      return { ...state, calculation: null, nextOperation: null }
   }
 }
 

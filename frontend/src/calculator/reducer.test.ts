@@ -24,6 +24,10 @@ const ok = (result: number): CalculatorEvent => ({
   type: 'outcome',
   outcome: { kind: 'ok', result },
 })
+const unavailable = (message = SERVICE_UNAVAILABLE_MESSAGE): CalculatorEvent => ({
+  type: 'outcome',
+  outcome: { kind: 'unavailable', message },
+})
 
 describe('calculatorReducer', () => {
   it('shows 0 before any key is pressed', () => {
@@ -89,14 +93,61 @@ describe('calculatorReducer', () => {
     expect(calculatorReducer(state, equals)).toBe(state)
   })
 
-  it('keeps the state from before equals when the service is unavailable', () => {
-    const before = press(digit('2'), add, digit('3'))
-    const state = calculatorReducer(calculatorReducer(before, equals), {
-      type: 'outcome',
-      outcome: { kind: 'unavailable', message: SERVICE_UNAVAILABLE_MESSAGE },
+  describe('service unavailable', () => {
+    it('keeps the state from before equals and shows the service alert', () => {
+      const before = press(digit('2'), add, digit('3'))
+      const state = [equals, unavailable()].reduce(calculatorReducer, before)
+
+      expect(state).toEqual({ ...before, alert: SERVICE_UNAVAILABLE_MESSAGE })
+      expect(displayText(state)).toBe('3')
     })
 
-    expect(state).toEqual(before)
+    it("shows the service's message in the service alert", () => {
+      const state = press(digit('2'), add, digit('3'), equals, unavailable('internal error'))
+
+      expect(state.alert).toBe('internal error')
+    })
+
+    it.each([
+      ['a digit key', digit('4'), '34'],
+      ['an operator key', multiply, '3'],
+      ['equals', equals, '3'],
+    ])('clears the service alert on the next keypress, %s', (_, key, display) => {
+      const state = calculatorReducer(
+        press(digit('2'), add, digit('3'), equals, unavailable()),
+        key,
+      )
+
+      expect(state.alert).toBeNull()
+      expect(displayText(state)).toBe(display)
+    })
+
+    it('sends the same calculation again when equals is pressed to retry', () => {
+      const state = press(digit('2'), add, digit('3'), equals, unavailable(), equals)
+
+      expect(state.calculation).toEqual({ operation: 'add', operands: [2, 3] })
+    })
+
+    it('clears the service alert when the retried calculation comes back', () => {
+      const state = press(digit('2'), add, digit('3'), equals, unavailable(), equals, ok(5))
+
+      expect(state.alert).toBeNull()
+      expect(displayText(state)).toBe('5')
+    })
+  })
+
+  describe('calculation in flight', () => {
+    const inFlight = () => press(digit('2'), add, digit('3'), equals)
+
+    it.each([
+      ['a digit key', digit('4')],
+      ['an operator key', multiply],
+      ['equals', equals],
+    ])('ignores %s until the outcome arrives', (_, key) => {
+      const state = inFlight()
+
+      expect(calculatorReducer(state, key)).toBe(state)
+    })
   })
 
   describe('display formatting', () => {
@@ -157,12 +208,9 @@ describe('calculatorReducer', () => {
 
     it('keeps the state from before the operator key when the service is unavailable', () => {
       const before = press(digit('2'), add, digit('3'))
-      const state = press(digit('2'), add, digit('3'), multiply, {
-        type: 'outcome',
-        outcome: { kind: 'unavailable', message: SERVICE_UNAVAILABLE_MESSAGE },
-      })
+      const state = [multiply, unavailable()].reduce(calculatorReducer, before)
 
-      expect(state).toEqual(before)
+      expect(state).toEqual({ ...before, alert: SERVICE_UNAVAILABLE_MESSAGE })
     })
   })
 

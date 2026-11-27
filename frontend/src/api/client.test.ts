@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import type { Calculation } from '../calculator/operations'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Calculation, Outcome } from '../calculator/operations'
 import { createCalculatorClient, SERVICE_UNAVAILABLE_MESSAGE } from './client'
 
 type FetchCall = { url: string; init: RequestInit | undefined }
@@ -45,15 +45,19 @@ describe('createCalculatorClient', () => {
     expect(outcome).toEqual({ kind: 'ok', result: 5 })
   })
 
-  it('reports service unavailable with the envelope message the service sent', async () => {
-    const { fetch } = fakeFetch(() =>
-      json(500, { error: { code: 'INTERNAL_ERROR', message: 'internal error' } }),
-    )
+  it.each([
+    [400, 'INVALID_OPERAND_COUNT', 'expected 2 operands for add, got 1'],
+    [500, 'INTERNAL_ERROR', 'internal error'],
+  ])(
+    'reports service unavailable with the envelope message for a %i',
+    async (status, code, message) => {
+      const { fetch } = fakeFetch(() => json(status, { error: { code, message } }))
 
-    const outcome = await createCalculatorClient(fetch).calculate(twoPlusThree)
+      const outcome = await createCalculatorClient(fetch).calculate(twoPlusThree)
 
-    expect(outcome).toEqual({ kind: 'unavailable', message: 'internal error' })
-  })
+      expect(outcome).toEqual({ kind: 'unavailable', message })
+    },
+  )
 
   it.each([
     ['the network fails', () => Promise.reject(new TypeError('Failed to fetch'))],
@@ -69,5 +73,45 @@ describe('createCalculatorClient', () => {
     const outcome = await createCalculatorClient(fetch).calculate(twoPlusThree)
 
     expect(outcome).toEqual({ kind: 'unavailable', message: SERVICE_UNAVAILABLE_MESSAGE })
+  })
+
+  describe('timeout', () => {
+    beforeEach(() => vi.useFakeTimers())
+    afterEach(() => vi.useRealTimers())
+
+    // A service that never answers until the request is aborted.
+    const hang = (init: RequestInit | undefined) =>
+      new Promise<Response>((_, reject) => {
+        init?.signal?.addEventListener('abort', () =>
+          reject(new DOMException('aborted', 'AbortError')),
+        )
+      })
+
+    it('reports service unavailable when the service takes longer than 5 s', async () => {
+      const fetch: typeof globalThis.fetch = (_, init) => hang(init)
+      let outcome: Outcome | undefined
+      void createCalculatorClient(fetch)
+        .calculate(twoPlusThree)
+        .then((o) => (outcome = o))
+
+      await vi.advanceTimersByTimeAsync(4_999)
+      expect(outcome).toBeUndefined()
+      await vi.advanceTimersByTimeAsync(1)
+
+      expect(outcome).toEqual({ kind: 'unavailable', message: SERVICE_UNAVAILABLE_MESSAGE })
+    })
+
+    it('reports service unavailable when a body takes longer than 5 s to arrive', async () => {
+      const fetch: typeof globalThis.fetch = (_, init) =>
+        Promise.resolve({ status: 200, json: () => hang(init) } as Response)
+      let outcome: Outcome | undefined
+      void createCalculatorClient(fetch)
+        .calculate(twoPlusThree)
+        .then((o) => (outcome = o))
+
+      await vi.advanceTimersByTimeAsync(5_000)
+
+      expect(outcome).toEqual({ kind: 'unavailable', message: SERVICE_UNAVAILABLE_MESSAGE })
+    })
   })
 })
