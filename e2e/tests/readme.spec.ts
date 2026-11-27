@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { promisify } from 'node:util'
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 const run = promisify(execFile)
 
@@ -51,29 +51,36 @@ test(
     for (const { command, output } of examples) {
       await test.step(command, async () => {
         const { stdout } = await run('sh', ['-c', command.replaceAll(README_ORIGIN, baseURL!)])
-        transcript.push({ command, output: normalise(stdout) })
-        expect(normalise(stdout)).toBe(output)
+        const printed = normalise(stdout)
+        transcript.push({ command, output: printed })
+        expect(printed).toBe(output)
       })
     }
 
-    // The evidence for this test: each command above what the service printed,
-    // with the viewport grown so the screenshot holds the whole transcript.
-    const pre = 'margin: 0; white-space: pre-wrap; overflow-wrap: anywhere'
-    await page.setContent(
-      `<main style="font: 12px/1.4 ui-monospace, monospace; padding: 16px">${transcript
-        .map(
-          ({ command, output }) =>
-            `<pre style="${pre}; color: #555">$ ${escape(command)}</pre>` +
-            `<pre style="${pre}; margin-bottom: 14px">${escape(output)}</pre>`,
-        )
-        .join('')}</main>`,
-    )
-    await expect(page.locator('pre')).toHaveCount(2 * examples.length)
-    const height = await page.evaluate(() => document.documentElement.scrollHeight)
-    await page.setViewportSize({ width: page.viewportSize()!.width, height })
+    await showTranscript(page, transcript)
   },
 )
 
-function escape(text: string): string {
+/**
+ * The evidence for this test: each command above what the service printed,
+ * with the viewport grown so the screenshot holds the whole transcript.
+ */
+async function showTranscript(page: Page, transcript: Example[]) {
+  const pre = 'margin: 0; white-space: pre-wrap; overflow-wrap: anywhere'
+  await page.setContent(
+    `<main style="font: 12px/1.4 ui-monospace, monospace; padding: 16px">${transcript
+      .map(
+        ({ command, output }) =>
+          `<pre style="${pre}; color: #555">$ ${escapeHtml(command)}</pre>` +
+          `<pre style="${pre}; margin-bottom: 14px">${escapeHtml(output)}</pre>`,
+      )
+      .join('')}</main>`,
+  )
+  await expect(page.locator('pre')).toHaveCount(2 * transcript.length)
+  const height = await page.evaluate(() => document.documentElement.scrollHeight)
+  await page.setViewportSize({ width: page.viewportSize()!.width, height })
+}
+
+function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }

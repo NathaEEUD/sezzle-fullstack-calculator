@@ -69,28 +69,25 @@ This starts the service on <http://localhost:8080> and the Vite dev server on <h
 ### Run the service on its own
 
 ```bash
-make build
+make run
 ```
 
-```bash
-./bin/calculator
-```
-
-Without `STATIC_DIR` the binary is an API-only microservice on port 8080. To serve the built app from it as well, the way the image does:
+This builds the app and the service, then runs `bin/calculator` on port 8080. Without `STATIC_DIR` the binary is an API-only microservice. To serve the built app from it as well, the way the image does:
 
 ```bash
-STATIC_DIR=frontend/dist ./bin/calculator
+make run STATIC_DIR=frontend/dist
 ```
 
 ### Every command
 
-Every command is a Make target. `make help` lists them:
+Every project command is a Make target. `make help` lists them:
 
 ```text
   help       List the targets
   install    Install npm dependencies and the Playwright browser
   dev        Run the service on :8080 and the Vite dev server, which proxies /api to it
   build      Build the app into frontend/dist and the service into bin/calculator
+  run        Build, then run the service on :8080; STATIC_DIR=frontend/dist also serves the app
   fmt        Format Go, TypeScript and CSS
   fmt-check  Fail if anything needs formatting
   vet        go vet
@@ -120,7 +117,7 @@ The service reads its configuration from the environment and nothing else.
 
 ## API
 
-Three routes, and nothing else:
+Three API routes, and nothing else. When `STATIC_DIR` is set, every other `GET` serves the app.
 
 | Method | Path | Answers |
 | --- | --- | --- |
@@ -396,7 +393,7 @@ Other choices and assumptions:
 - **The service is stateless.** It never sees a chain, only one calculation at a time. Keypad state (the pending operation, the last calculation for repeated equals, the percent base) lives in the app's reducer.
 - **Results are float64.** The service returns the raw result. The app shows at most 12 significant digits with trailing zeros stripped, switches to exponent notation at ≥ 1e12 or < 1e-9, shows −0 as 0, and keeps the full-precision result in state so chained calculations don't build up rounding errors. An entry holds at most 15 significant digits.
 - **Real numbers only.** √ of a negative is a maths error, not a complex number.
-- **422 for maths errors, 400 for bad requests.** "The maths has no answer" and "your request is wrong" need different handling, and only the first is the person's to see. The app shows a 422 message in the display and treats every other failure as service unavailable, keeping its state from before the keypress so the person can retry.
+- **422 for maths errors, 400 for bad requests.** "The calculation has no result" and "your request is wrong" need different handling, and only the first is the person's to see. The app shows a 422 message in the display and treats every other failure as service unavailable, keeping its state from before the keypress so the person can retry.
 - **Standard library only in Go; React and React DOM only in the app.** No router, UI kit, state library or HTTP library, because the problem is small enough that each would cost more to learn than to replace.
 - **Out of scope:** precedence and expression parsing, arbitrary-precision decimals, memory keys and history, a ± key, parentheses, sessions and authentication, localisation.
 
@@ -430,7 +427,7 @@ The brief's optional items are all built: power, square root, percent and the Do
 | --- | --- |
 | `GET /api/v1/operations` and an e2e contract test | The app's keys and the service's registry can't drift apart unnoticed. |
 | `GET /healthz` | Playwright and `make docker-e2e` wait on it before running, and it's what any orchestrator would probe. |
-| Service unavailable handling: a 5 s timeout, a service alert, keys ignored while a calculation is in flight, and state kept for a retry | A network failure should never look like a wrong answer or lose what the person typed. |
+| Service unavailable handling: a 5 s timeout, a service alert, keys ignored while a calculation is in flight, and state kept for a retry | A network failure should never look like a wrong result or lose what the person typed. |
 | Keyboard bindings for every key, visible focus rings, accessible names, a polite live region for the display | The brief asks for an intuitive UI; that includes people who don't use a mouse or can't see the screen. |
 | WCAG AA contrast, 44×44 px touch targets, a layout that works from 320 px, dark mode | "Basic mobile support", done so it holds on a small phone. |
 | Opt-in CORS through `CORS_ALLOWED_ORIGINS` | Lets the service run behind another origin without opening it by default. |

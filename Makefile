@@ -4,7 +4,7 @@ GO_COVER   := coverage/backend
 PLAYWRIGHT := cd e2e && npx playwright
 IMAGE      := calculator
 
-.PHONY: help install dev build build-web build-go fmt fmt-check vet lint typecheck \
+.PHONY: help install dev build build-web build-go run fmt fmt-check vet lint typecheck \
         test test-go test-web coverage e2e gate evidence docker docker-e2e
 
 help: ## List the targets
@@ -22,6 +22,9 @@ dev: ## Run the service on :8080 and the Vite dev server, which proxies /api to 
 	wait
 
 build: build-web build-go ## Build the app into frontend/dist and the service into bin/calculator
+
+run: build ## Build, then run the service on :8080; STATIC_DIR=frontend/dist also serves the app
+	./bin/calculator
 
 build-web:
 	cd frontend && npm run build
