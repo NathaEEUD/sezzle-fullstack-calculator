@@ -24,6 +24,7 @@ The design stages (agent skills setup through to-tickets) are reused as they wer
 | Build: maths errors (#7) | [`58aa8b9d`](docs/prompts/2026-11-27-1030-58aa8b9d.md) | [Build: maths errors](#build-maths-errors) |
 | Build: power and square root (#10) | [`09f71fd8`](docs/prompts/2026-11-27-1046-09f71fd8.md) | [Build: power and square root](#build-power-and-square-root) |
 | Build: percent (#11) | [`055b6c2d`](docs/prompts/2026-11-27-1046-055b6c2d.md) | [Build: percent](#build-percent) |
+| Build: keyboard and layout (#12) | [`4b0beca3`](docs/prompts/2026-11-27-1106-4b0beca3.md) | [Build: keyboard and layout](#build-keyboard-and-layout) |
 
 ## Setup: prompt capture
 
@@ -431,4 +432,39 @@ log this session in PROMPTS.md and open a PR
 
 ````text
 PR #25 (https://github.com/NathaEEUD/sezzle-fullstack-calculator/pull/25) has merge conflicts with its base branch. Merge the base branch in, resolve the conflicts, and push.
+````
+
+## Build: keyboard and layout
+
+Ran Matt Pocock's `implement` on [#12](https://github.com/NathaEEUD/sezzle-fullstack-calculator/issues/12) in a new branch and worktree, cut from `origin/main` after #10 and #11 had merged. The ticket is `ready-for-agent`, so the `tdd` seams came from the issue's acceptance criteria and `CODING_STANDARDS.md` with no check-in: a Keypad component test with `user-event`, the Calculator component test with a fake client, and `@issue-12` Playwright tests on Chromium and 360 px. The 360 px project was already in the Playwright config.
+
+Each slice went red, then green:
+
+- the Keypad: every key carries its keyboard keys, one `keydown` listener on `window` dispatches the same event as a click, and a parity table checks all 21 keys;
+- the Keypad: Ctrl, Cmd and Alt shortcuts are left alone, so reload and browser zoom (`Ctrl -`, `Ctrl =`) still work;
+- the Calculator: Enter after a click is equals, not the focused key again. The first version of this test passed with `preventDefault` removed, because the extra click landed while a calculation was in flight and was ignored. It was rewritten around a key that sends nothing, and then failed as it should without `preventDefault`;
+- e2e: a keyboard-only chain, a focus ring of at least 2 px and 3:1 on every key reached with Tab, the 320 px layout with no horizontal scroll and keys of at least 44×44, a viewport meta that allows zoom, and WCAG AA contrast for the display, keys, title and service alert in light and dark.
+
+The focus ring and dark mode tests went red until `tokens.css` gained the focus ring, operator and equals key colours, and a dark set under `prefers-color-scheme`. Hover states sit under `@media (hover: hover)`, so a tapped key on a phone doesn't stay highlighted. The keyboard-only test flaked once on 360 px, because typing started before the listener attached; it now waits for the keypad first, and passed 30 repeats.
+
+The issue's binding list has no key for square root, so `r` was chosen and added to the keyboard line of `CODING_STANDARDS.md`, along with the three rules the tests pin down: a bound key wins over the focused button, Space presses the focused button, and modifier shortcuts go to the browser.
+
+The `code-review` skill then ran its Standards and Spec reviews in parallel. Neither found a hard violation. Their fixes landed in a second commit:
+
+- square root also answers to `R`, so Caps Lock doesn't disable it;
+- `useCalculator` returns a stable `onKey`, so the listener isn't re-attached on every keypress;
+- the binding map and its values are named for what they hold, the Keypad test records events with a plain fake instead of `vi.fn`, and the e2e spec shares one page background helper.
+
+The first gate run after those fixes failed typecheck on a shadowed variable, and the commit had already been made in the same command. It was fixed, the gate rerun green, the evidence re-recorded, and the commit amended before anything was pushed.
+
+Some findings were left as they are. The operator and equals colours are more design than the issue asked for. Holding Enter repeats equals, like pressing it again. The `r` shortcut isn't shown on screen. Story 32 in #3 still lists the bindings without √.
+
+The raw log for this session also holds the two reviewers' reports, at 11:13. The hook captured them because they reached the session as messages, but nobody typed them. The hook wrote the log into the main checkout, not the worktree, so it was copied here.
+
+````text
+/mattpocock-skills:implement 12 in a new branch
+````
+
+````text
+log this session in PROMPTS.md and open a PR
 ````
