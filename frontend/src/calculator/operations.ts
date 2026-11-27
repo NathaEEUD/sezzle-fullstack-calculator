@@ -1,5 +1,10 @@
 /** Every operation the service evaluates, with its arity. Kept equal to the service registry. */
-export const OPERATIONS = [{ name: 'add', arity: 2 }] as const
+export const OPERATIONS = [
+  { name: 'add', arity: 2 },
+  { name: 'divide', arity: 2 },
+  { name: 'multiply', arity: 2 },
+  { name: 'subtract', arity: 2 },
+] as const
 
 export type OperationName = (typeof OPERATIONS)[number]['name']
 
