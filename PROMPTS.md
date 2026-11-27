@@ -14,6 +14,7 @@ The design stages (agent skills setup through to-tickets) are reused as they wer
 | Setup: agent entry point and standards | — | [Setup: agent entry point and standards](#setup-agent-entry-point-and-standards) |
 | Spec: to-spec | — | [Spec: to-spec](#spec-to-spec) |
 | Plan: to-tickets | — | [Plan: to-tickets](#plan-to-tickets) |
+| Build: walking skeleton (#4) | [`bafb1d07`](docs/prompts/2026-11-27-0911-bafb1d07.md) | [Build: walking skeleton](#build-walking-skeleton) |
 
 ## Setup: prompt capture
 
@@ -95,4 +96,25 @@ Add the evidence harness to #7 so every later slice inherits it. Append to #7's 
 
 
 do you agree with this approach or do you have a better approach?
+````
+
+## Build: walking skeleton
+
+Ran Matt Pocock's `implement` on [#4](https://github.com/NathaEEUD/sezzle-fullstack-calculator/issues/4) in a new branch. The `tdd` seams were proposed from `CODING_STANDARDS.md` and approved as proposed: calc table tests, `httptest` against `NewHandler`, plain reducer tests, the client with a fake `fetch`, Testing Library with a fake client, and the `@issue-4` Playwright smoke on Chromium and 360 px. Each layer went red, then green. The rest of the error-code table was left to #8. Two choices departed from the Vite template: ESLint in place of oxlint, as the standards require, and TypeScript pinned to 6.0, because typescript-eslint doesn't support 7.
+
+The `code-review` skill then ran its Standards and Spec reviews in parallel. Their fixes landed in a second commit:
+
+- a result JSON can't carry gave an empty 200, and is now a 500 envelope;
+- the client discarded the envelope message, against ADR-0004;
+- the glossary's _Avoid_ terms (`request`, `op`) appeared in code;
+- `make evidence` could record a stale server and hid Playwright's errors.
+
+The raw log for this session also holds the two reviewers' reports, at 09:23. The hook captured them because they reached the session as messages, but nobody typed them.
+
+````text
+/mattpocock-skills:implement 4 in a new branch
+````
+
+````text
+log this session in PROMPTS.md and open a PR
 ````
