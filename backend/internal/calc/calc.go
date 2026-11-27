@@ -32,6 +32,8 @@ var registry = map[string]entry{
 	"subtract": {arity: 2, apply: alwaysReal(func(o []float64) float64 { return o[0] - o[1] })},
 	"multiply": {arity: 2, apply: alwaysReal(func(o []float64) float64 { return o[0] * o[1] })},
 	"divide":   {arity: 2, apply: divide},
+	"power":    {arity: 2, apply: power},
+	"sqrt":     {arity: 1, apply: alwaysReal(func(o []float64) float64 { return math.Sqrt(o[0]) })},
 }
 
 func divide(o []float64) (float64, error) {
@@ -41,9 +43,18 @@ func divide(o []float64) (float64, error) {
 	return o[0] / o[1], nil
 }
 
+// power is 0 to a negative power as a division by zero; math.Pow would give
+// ±Inf, which reads as an overflow.
+func power(o []float64) (float64, error) {
+	if o[0] == 0 && o[1] < 0 {
+		return 0, &Error{Code: CodeDivisionByZero, Message: "Cannot divide by zero"}
+	}
+	return math.Pow(o[0], o[1]), nil
+}
+
 // Evaluate applies the named operation to its operands and returns the raw
 // result, or a *Error. Every result passes one finiteness check, so a caller
-// never sees ±Inf.
+// never sees NaN or ±Inf.
 func Evaluate(name string, operands []float64) (float64, error) {
 	if name == "" {
 		return 0, &Error{Code: CodeUnknownOperation, Message: "operation is required"}
@@ -61,6 +72,9 @@ func Evaluate(name string, operands []float64) (float64, error) {
 	result, err := found.apply(operands)
 	if err != nil {
 		return 0, err
+	}
+	if math.IsNaN(result) {
+		return 0, &Error{Code: CodeInvalidOperand, Message: "Not a real number"}
 	}
 	if math.IsInf(result, 0) {
 		return 0, &Error{Code: CodeOverflow, Message: "Result too large"}

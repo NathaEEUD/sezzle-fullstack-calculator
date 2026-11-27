@@ -19,7 +19,3 @@
 .key:active {
   background: var(--key-bg-active);
 }
-
-.wide {
-  grid-column: span 2;
-}

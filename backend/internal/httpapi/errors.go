@@ -64,6 +64,7 @@ var calcStatus = map[calc.Code]int{
 	calc.CodeUnknownOperation:    http.StatusBadRequest,
 	calc.CodeInvalidOperandCount: http.StatusBadRequest,
 	calc.CodeDivisionByZero:      http.StatusUnprocessableEntity,
+	calc.CodeInvalidOperand:      http.StatusUnprocessableEntity,
 	calc.CodeOverflow:            http.StatusUnprocessableEntity,
 }
 
