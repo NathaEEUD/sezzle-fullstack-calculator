@@ -2,12 +2,12 @@ import { useEffect } from 'react'
 import type { KeyEvent, PendableOperationName } from '../calculator/reducer'
 import styles from './Keypad.module.css'
 
-/** `keyboard` lists the `KeyboardEvent.key` values bound to the key. */
+/** `keyboardKeys` lists the `KeyboardEvent.key` values bound to the key. */
 type Key = {
   label: string
   name: string
   event: KeyEvent
-  keyboard: string[]
+  keyboardKeys: string[]
   variant?: 'operator' | 'equals'
 }
 
@@ -15,31 +15,31 @@ const digit = (d: string): Key => ({
   label: d,
   name: d,
   event: { type: 'digit', digit: d },
-  keyboard: [d],
+  keyboardKeys: [d],
 })
 
-const operator = (label: string, operation: PendableOperationName, keyboard: string): Key => ({
+const operator = (label: string, operation: PendableOperationName, keyboardKey: string): Key => ({
   label,
   name: operation,
   event: { type: 'operator', operation },
-  keyboard: [keyboard],
+  keyboardKeys: [keyboardKey],
   variant: 'operator',
 })
 
 /** In reading order on a four-column grid, operator keys down the right and equals across the bottom row. */
 const KEYS: Key[] = [
-  { label: 'C', name: 'clear', event: { type: 'clear' }, keyboard: ['Escape'] },
+  { label: 'C', name: 'clear', event: { type: 'clear' }, keyboardKeys: ['Escape'] },
   {
     label: '⌫',
     name: 'delete last digit',
     event: { type: 'deleteLastDigit' },
-    keyboard: ['Backspace'],
+    keyboardKeys: ['Backspace'],
   },
   {
     label: '√',
     name: 'square root',
     event: { type: 'unaryOperator', operation: 'sqrt' },
-    keyboard: ['r'],
+    keyboardKeys: ['r', 'R'],
     variant: 'operator',
   },
   operator('xʸ', 'power', '^'),
@@ -50,12 +50,12 @@ const KEYS: Key[] = [
   ...['1', '2', '3'].map(digit),
   operator('−', 'subtract', '-'),
   digit('0'),
-  { label: '.', name: 'decimal point', event: { type: 'decimalPoint' }, keyboard: ['.'] },
+  { label: '.', name: 'decimal point', event: { type: 'decimalPoint' }, keyboardKeys: ['.'] },
   {
     label: '%',
     name: 'percent',
     event: { type: 'percent' },
-    keyboard: ['%'],
+    keyboardKeys: ['%'],
     variant: 'operator',
   },
   operator('+', 'add', '+'),
@@ -63,12 +63,14 @@ const KEYS: Key[] = [
     label: '=',
     name: 'equals',
     event: { type: 'equals' },
-    keyboard: ['Enter', '='],
+    keyboardKeys: ['Enter', '='],
     variant: 'equals',
   },
 ]
 
-const BY_KEYBOARD = new Map(KEYS.flatMap((key) => key.keyboard.map((k) => [k, key.event])))
+const EVENT_BY_KEYBOARD_KEY = new Map(
+  KEYS.flatMap((key) => key.keyboardKeys.map((keyboardKey) => [keyboardKey, key.event])),
+)
 
 /** Keyboard input dispatches the same events as clicks, wherever focus is on the page. */
 function useKeyboard(onKey: (key: KeyEvent) => void) {
@@ -76,11 +78,11 @@ function useKeyboard(onKey: (key: KeyEvent) => void) {
     function onKeyDown(event: KeyboardEvent) {
       // Shift stays allowed: it types * + % ^ on most layouts.
       if (event.ctrlKey || event.metaKey || event.altKey) return
-      const key = BY_KEYBOARD.get(event.key)
-      if (key === undefined) return
+      const keyEvent = EVENT_BY_KEYBOARD_KEY.get(event.key)
+      if (keyEvent === undefined) return
       // A bound key wins over the focused button, so Enter is always equals.
       event.preventDefault()
-      onKey(key)
+      onKey(keyEvent)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)

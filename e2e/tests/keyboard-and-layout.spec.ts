@@ -66,6 +66,10 @@ async function colours(locator: Locator): Promise<{ fg: Rgb; bg: Rgb }> {
 
 const display = (page: Page) => page.getByRole('status', { name: 'display' })
 
+async function pageBackground(page: Page): Promise<Rgb> {
+  return parseRgb(await page.evaluate(() => getComputedStyle(document.body).backgroundColor))
+}
+
 test(
   'keyboard only: 2 + 3 × 4 = shows 20, then Escape clears it',
   { tag: '@issue-12' },
@@ -98,9 +102,7 @@ test(
   { tag: '@issue-12' },
   async ({ page }) => {
     await page.goto('/')
-    const pageBackground = parseRgb(
-      await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
-    )
+    const background = await pageBackground(page)
 
     for (const name of KEY_NAMES) {
       await page.keyboard.press('Tab')
@@ -113,7 +115,7 @@ test(
       })
       expect(ring.style, name).not.toBe('none')
       expect(parseFloat(ring.width), name).toBeGreaterThanOrEqual(2)
-      expect(contrast(parseRgb(ring.color), pageBackground), name).toBeGreaterThanOrEqual(3)
+      expect(contrast(parseRgb(ring.color), background), name).toBeGreaterThanOrEqual(3)
     }
   },
 )
@@ -159,9 +161,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.route('**/api/v1/calculate', (route) => route.abort())
       await page.goto('/')
 
-      const body = parseRgb(
-        await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
-      )
+      const body = await pageBackground(page)
       if (colorScheme === 'dark') expect(luminance(body)).toBeLessThan(0.1)
       else expect(luminance(body)).toBeGreaterThan(0.8)
 

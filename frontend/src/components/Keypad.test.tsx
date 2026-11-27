@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { KeyEvent } from '../calculator/reducer'
 import { Keypad } from './Keypad'
 
@@ -14,7 +14,7 @@ const BINDINGS: [name: string, keyboard: string[]][] = [
   ['divide', ['/']],
   ['power', ['^']],
   ['percent', ['%']],
-  ['square root', ['r']],
+  ['square root', ['r', 'R']],
   ['equals', ['{Enter}', '=']],
   ['delete last digit', ['{Backspace}']],
   ['clear', ['{Escape}']],
@@ -22,9 +22,8 @@ const BINDINGS: [name: string, keyboard: string[]][] = [
 
 function renderKeypad() {
   const events: KeyEvent[] = []
-  const onKey = vi.fn((event: KeyEvent) => events.push(event))
-  render(<Keypad onKey={onKey} />)
-  return { events, onKey }
+  render(<Keypad onKey={(event) => events.push(event)} />)
+  return { events }
 }
 
 describe('Keypad', () => {
@@ -57,7 +56,7 @@ describe('Keypad', () => {
     'leaves %s shortcuts such as reload and zoom to the browser',
     async (modifier) => {
       const user = userEvent.setup()
-      const { onKey } = renderKeypad()
+      const { events } = renderKeypad()
       const defaultPrevented: boolean[] = []
       const record = (event: KeyboardEvent) => defaultPrevented.push(event.defaultPrevented)
       window.addEventListener('keydown', record)
@@ -65,7 +64,7 @@ describe('Keypad', () => {
       await user.keyboard(`{${modifier}>}r-={/${modifier}}`)
 
       window.removeEventListener('keydown', record)
-      expect(onKey).not.toHaveBeenCalled()
+      expect(events).toEqual([])
       expect(defaultPrevented).not.toContain(true)
     },
   )
