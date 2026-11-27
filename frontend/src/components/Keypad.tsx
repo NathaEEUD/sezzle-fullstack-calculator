@@ -14,13 +14,16 @@ const operator = (label: string, operation: OperationName): Key => ({
 
 /** In reading order on a four-column grid, operator keys down the right. */
 const KEYS: Key[] = [
+  { label: 'C', name: 'clear', event: { type: 'clear' }, wide: true },
+  { label: '⌫', name: 'delete last digit', event: { type: 'deleteLastDigit' }, wide: true },
   ...['7', '8', '9'].map(digit),
   operator('÷', 'divide'),
   ...['4', '5', '6'].map(digit),
   operator('×', 'multiply'),
   ...['1', '2', '3'].map(digit),
   operator('−', 'subtract'),
-  { ...digit('0'), wide: true },
+  digit('0'),
+  { label: '.', name: 'decimal point', event: { type: 'decimalPoint' } },
   { label: '=', name: 'equals', event: { type: 'equals' } },
   operator('+', 'add'),
 ]
