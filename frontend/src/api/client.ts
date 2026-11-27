@@ -7,15 +7,21 @@ export type CalculatorClient = {
   calculate(calculation: Calculation): Promise<Outcome>
 }
 
+/** How long a calculation may take, body included, before the service counts as unavailable. */
+const TIMEOUT_MS = 5_000
+
 /** A client for the calculation service. It never throws: every failure is an Outcome. */
 export function createCalculatorClient(fetch: typeof globalThis.fetch): CalculatorClient {
   return {
     async calculate(calculation) {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
       try {
         const response = await fetch('/api/v1/calculate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(calculation),
+          signal: controller.signal,
         })
         const body: unknown = await response.json()
         if (response.status === 200 && hasNumericResult(body)) {
@@ -26,8 +32,10 @@ export function createCalculatorClient(fetch: typeof globalThis.fetch): Calculat
           message: envelopeMessage(body) ?? SERVICE_UNAVAILABLE_MESSAGE,
         }
       } catch {
-        // Network failure or a body that isn't JSON: the service is unavailable.
+        // Network failure, timeout or a body that isn't JSON: the service is unavailable.
         return { kind: 'unavailable', message: SERVICE_UNAVAILABLE_MESSAGE }
+      } finally {
+        clearTimeout(timer)
       }
     },
   }
