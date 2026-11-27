@@ -10,7 +10,8 @@ import (
 )
 
 type config struct {
-	staticDir string
+	staticDir      string
+	allowedOrigins map[string]bool
 }
 
 // Option configures NewHandler.
@@ -20,6 +21,13 @@ type Option func(*config)
 // An empty dir serves nothing, so callers can pass STATIC_DIR as it is.
 func WithStaticDir(dir string) Option {
 	return func(c *config) { c.staticDir = dir }
+}
+
+// WithCORSAllowedOrigins lets the comma-separated origins in list call the
+// service from another origin. An empty list keeps CORS off, so callers can
+// pass CORS_ALLOWED_ORIGINS as it is.
+func WithCORSAllowedOrigins(list string) Option {
+	return func(c *config) { c.allowedOrigins = parseOrigins(list) }
 }
 
 // NewHandler builds every route and middleware of the service.
@@ -34,13 +42,13 @@ func NewHandler(logger *slog.Logger, opts ...Option) http.Handler {
 	service.HandleFunc("POST /api/v1/calculate", api.calculate)
 	service.HandleFunc("GET /api/v1/operations", api.operations)
 	service.HandleFunc("GET /healthz", api.healthz)
-	if cfg.staticDir == "" {
-		return api.recoverPanics(api.route(service))
+	var routes http.Handler = api.route(service)
+	if cfg.staticDir != "" {
+		app := http.NewServeMux()
+		app.Handle("GET /", staticHandler(cfg.staticDir))
+		routes = serviceOrApp(routes, api.route(app))
 	}
-
-	app := http.NewServeMux()
-	app.Handle("GET /", staticHandler(cfg.staticDir))
-	return api.recoverPanics(serviceOrApp(api.route(service), api.route(app)))
+	return api.logRequests(api.recoverPanics(cors(cfg.allowedOrigins, routes)))
 }
 
 type api struct {

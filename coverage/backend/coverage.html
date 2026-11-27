@@ -63,15 +63,19 @@
 				
 				<option value="file3">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/calculate.go (100.0%)</option>
 				
-				<option value="file4">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/errors.go (93.8%)</option>
+				<option value="file4">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/cors.go (100.0%)</option>
 				
-				<option value="file5">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/handler.go (100.0%)</option>
+				<option value="file5">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/errors.go (93.8%)</option>
 				
-				<option value="file6">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/middleware.go (100.0%)</option>
+				<option value="file6">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/handler.go (100.0%)</option>
 				
-				<option value="file7">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/operations.go (100.0%)</option>
+				<option value="file7">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/middleware.go (97.6%)</option>
 				
-				<option value="file8">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/static.go (100.0%)</option>
+				<option value="file8">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/operations.go (100.0%)</option>
+				
+				<option value="file9">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/static.go (100.0%)</option>
+				
+				<option value="file10">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/logging/logging.go (100.0%)</option>
 				
 				</select>
 			</div>
@@ -100,11 +104,16 @@ import (
         "time"
 
         "github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi"
+        "github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/logging"
 )
 
 func main() {
-        <span class="cov0" title="0">logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-        if err := run(logger); err != nil </span>{
+        <span class="cov0" title="0">logger, err := logging.New(os.Stdout, os.Getenv("LOG_LEVEL"))
+        if err != nil </span>{
+                <span class="cov0" title="0">slog.Error("server not started", "error", err)
+                os.Exit(1)
+</span>        }
+        <span class="cov0" title="0">if err := run(logger); err != nil </span>{
                 <span class="cov0" title="0">logger.Error("server stopped", "error", err)
                 os.Exit(1)
 </span>        }
@@ -116,10 +125,14 @@ func run(logger *slog.Logger) error {
                 <span class="cov0" title="0">port = "8080"
 </span>        }
         <span class="cov0" title="0">staticDir := os.Getenv("STATIC_DIR")
+        allowedOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
 </span>
         <span class="cov0" title="0">srv := &amp;http.Server{
-                Addr:              ":" + port,
-                Handler:           httpapi.NewHandler(logger, httpapi.WithStaticDir(staticDir)),
+                Addr: ":" + port,
+                Handler: httpapi.NewHandler(logger,
+                        httpapi.WithStaticDir(staticDir),
+                        httpapi.WithCORSAllowedOrigins(allowedOrigins),
+                ),
                 ReadHeaderTimeout: 5 * time.Second,
                 ReadTimeout:       10 * time.Second,
                 WriteTimeout:      10 * time.Second,
@@ -131,7 +144,7 @@ func run(logger *slog.Logger) error {
 </span>
         <span class="cov0" title="0">errs := make(chan error, 1)
         go func() </span>{
-                <span class="cov0" title="0">logger.Info("listening", "addr", srv.Addr, "static_dir", staticDir)
+                <span class="cov0" title="0">logger.Info("listening", "addr", srv.Addr, "static_dir", staticDir, "cors_allowed_origins", allowedOrigins)
                 errs &lt;- srv.ListenAndServe()
 </span>        }()
 
@@ -360,6 +373,62 @@ func typeError(err *json.UnmarshalTypeError) error {
 		<pre class="file" id="file4" style="display: none">package httpapi
 
 import (
+        "net/http"
+        "strings"
+)
+
+// parseOrigins splits a comma-separated CORS_ALLOWED_ORIGINS value into its
+// origins, ignoring spaces and empty entries.
+func parseOrigins(list string) map[string]bool {
+        <span class="cov8" title="1">origins := map[string]bool{}
+        for origin := range strings.SplitSeq(list, ",") </span>{
+                <span class="cov8" title="1">if origin = strings.TrimSpace(origin); origin != "" </span>{
+                        <span class="cov8" title="1">origins[origin] = true
+</span>                }
+        }
+        <span class="cov8" title="1">return origins</span>
+}
+
+// cors lets the allowed origins call the service from another origin. An
+// allowed preflight is answered here with 204; a disallowed one gets a bare
+// 403. Every other request reaches next, with Access-Control-* headers only
+// for an allowed origin. Every response says Vary: Origin, because each one
+// depends on it. With no allowed origins it returns next unchanged.
+func cors(allowed map[string]bool, next http.Handler) http.Handler {
+        <span class="cov8" title="1">if len(allowed) == 0 </span>{
+                <span class="cov8" title="1">return next
+</span>        }
+        <span class="cov8" title="1">return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span>{
+                <span class="cov8" title="1">origin := r.Header.Get("Origin")
+                isPreflight := r.Method == http.MethodOptions &amp;&amp; origin != "" &amp;&amp;
+                        r.Header.Get("Access-Control-Request-Method") != ""
+                h := w.Header()
+                h.Add("Vary", "Origin")
+                if !allowed[origin] </span>{
+                        <span class="cov8" title="1">if isPreflight </span>{
+                                <span class="cov8" title="1">w.WriteHeader(http.StatusForbidden)
+                                return
+</span>                        }
+                        <span class="cov8" title="1">next.ServeHTTP(w, r)
+                        return</span>
+                }
+
+                <span class="cov8" title="1">h.Set("Access-Control-Allow-Origin", origin)
+                if isPreflight </span>{
+                        <span class="cov8" title="1">h.Set("Access-Control-Allow-Methods", "GET, POST")
+                        h.Set("Access-Control-Allow-Headers", "Content-Type")
+                        h.Set("Access-Control-Max-Age", "600")
+                        w.WriteHeader(http.StatusNoContent)
+                        return
+</span>                }
+                <span class="cov8" title="1">next.ServeHTTP(w, r)</span>
+        })
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package httpapi
+
+import (
         "errors"
         "fmt"
         "net/http"
@@ -444,7 +513,7 @@ func (a *api) writeError(w http.ResponseWriter, r *http.Request, err error) {
 }
 </pre>
 		
-		<pre class="file" id="file5" style="display: none">// Package httpapi exposes the calculator over HTTP: routing, decoding and the
+		<pre class="file" id="file6" style="display: none">// Package httpapi exposes the calculator over HTTP: routing, decoding and the
 // error envelope. HTTP status codes appear only in this package.
 package httpapi
 
@@ -456,7 +525,8 @@ import (
 )
 
 type config struct {
-        staticDir string
+        staticDir      string
+        allowedOrigins map[string]bool
 }
 
 // Option configures NewHandler.
@@ -466,6 +536,13 @@ type Option func(*config)
 // An empty dir serves nothing, so callers can pass STATIC_DIR as it is.
 func WithStaticDir(dir string) Option {
         <span class="cov8" title="1">return func(c *config) </span>{ <span class="cov8" title="1">c.staticDir = dir }</span>
+}
+
+// WithCORSAllowedOrigins lets the comma-separated origins in list call the
+// service from another origin. An empty list keeps CORS off, so callers can
+// pass CORS_ALLOWED_ORIGINS as it is.
+func WithCORSAllowedOrigins(list string) Option {
+        <span class="cov8" title="1">return func(c *config) </span>{ <span class="cov8" title="1">c.allowedOrigins = parseOrigins(list) }</span>
 }
 
 // NewHandler builds every route and middleware of the service.
@@ -480,13 +557,13 @@ func NewHandler(logger *slog.Logger, opts ...Option) http.Handler {
         service.HandleFunc("POST /api/v1/calculate", api.calculate)
         service.HandleFunc("GET /api/v1/operations", api.operations)
         service.HandleFunc("GET /healthz", api.healthz)
-        if cfg.staticDir == "" </span>{
-                <span class="cov8" title="1">return api.recoverPanics(api.route(service))
+        var routes http.Handler = api.route(service)
+        if cfg.staticDir != "" </span>{
+                <span class="cov8" title="1">app := http.NewServeMux()
+                app.Handle("GET /", staticHandler(cfg.staticDir))
+                routes = serviceOrApp(routes, api.route(app))
 </span>        }
-
-        <span class="cov8" title="1">app := http.NewServeMux()
-        app.Handle("GET /", staticHandler(cfg.staticDir))
-        return api.recoverPanics(serviceOrApp(api.route(service), api.route(app)))</span>
+        <span class="cov8" title="1">return api.logRequests(api.recoverPanics(cors(cfg.allowedOrigins, routes)))</span>
 }
 
 type api struct {
@@ -511,13 +588,14 @@ func (a *api) writeJSON(w http.ResponseWriter, r *http.Request, status int, body
 }
 </pre>
 		
-		<pre class="file" id="file6" style="display: none">package httpapi
+		<pre class="file" id="file7" style="display: none">package httpapi
 
 import (
         "fmt"
         "net/http"
         "runtime/debug"
         "strings"
+        "time"
 )
 
 // recoverPanics turns a panic in next into a 500 envelope. The panic value
@@ -583,9 +661,48 @@ type missRecorder struct {
 func (m *missRecorder) Header() http.Header         { <span class="cov8" title="1">return m.header }</span>
 func (m *missRecorder) WriteHeader(status int)      { <span class="cov8" title="1">m.status = status }</span>
 func (m *missRecorder) Write(b []byte) (int, error) { <span class="cov8" title="1">return len(b), nil }</span>
+
+// logRequests writes one INFO line per request with its method, path, status
+// and duration.
+func (a *api) logRequests(next http.Handler) http.Handler {
+        <span class="cov8" title="1">return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span>{
+                <span class="cov8" title="1">start := time.Now()
+                rec := &amp;statusRecorder{ResponseWriter: w, status: http.StatusOK}
+                next.ServeHTTP(rec, r)
+                a.logger.Info("request",
+                        "method", r.Method,
+                        "path", r.URL.Path,
+                        "status", rec.status,
+                        "duration", time.Since(start),
+                )
+</span>        })
+}
+
+// statusRecorder remembers the status written through it. A handler that
+// writes a body without a status has answered 200.
+type statusRecorder struct {
+        http.ResponseWriter
+        status      int
+        wroteHeader bool
+}
+
+func (s *statusRecorder) WriteHeader(status int) {
+        <span class="cov8" title="1">if !s.wroteHeader </span>{
+                <span class="cov8" title="1">s.status, s.wroteHeader = status, true
+</span>        }
+        <span class="cov8" title="1">s.ResponseWriter.WriteHeader(status)</span>
+}
+
+func (s *statusRecorder) Write(b []byte) (int, error) {
+        <span class="cov8" title="1">s.wroteHeader = true
+        return s.ResponseWriter.Write(b)
+</span>}
+
+// Unwrap lets http.ResponseController reach the server's writer.
+func (s *statusRecorder) Unwrap() http.ResponseWriter { <span class="cov0" title="0">return s.ResponseWriter }</span>
 </pre>
 		
-		<pre class="file" id="file7" style="display: none">package httpapi
+		<pre class="file" id="file8" style="display: none">package httpapi
 
 import (
         "net/http"
@@ -612,7 +729,7 @@ func (a *api) operations(w http.ResponseWriter, r *http.Request) {
 }
 </pre>
 		
-		<pre class="file" id="file8" style="display: none">package httpapi
+		<pre class="file" id="file9" style="display: none">package httpapi
 
 import (
         "io/fs"
@@ -634,6 +751,29 @@ func staticHandler(dir string) http.Handler {
 </span>                }
                 <span class="cov8" title="1">http.ServeFileFS(w, r, fsys, name)</span>
         })
+}
+</pre>
+		
+		<pre class="file" id="file10" style="display: none">// Package logging builds the service's logger from LOG_LEVEL.
+package logging
+
+import (
+        "fmt"
+        "io"
+        "log/slog"
+)
+
+// New returns a logger that writes JSON lines to w at the level named by
+// level (debug, info, warn or error, in any case). An empty level is info, so
+// callers can pass LOG_LEVEL as it is.
+func New(w io.Writer, level string) (*slog.Logger, error) {
+        <span class="cov8" title="1">var l slog.Level
+        if level != "" </span>{
+                <span class="cov8" title="1">if err := l.UnmarshalText([]byte(level)); err != nil </span>{
+                        <span class="cov8" title="1">return nil, fmt.Errorf("invalid LOG_LEVEL %q: want debug, info, warn or error", level)
+</span>                }
+        }
+        <span class="cov8" title="1">return slog.New(slog.NewJSONHandler(w, &amp;slog.HandlerOptions{Level: l})), nil</span>
 }
 </pre>
 		

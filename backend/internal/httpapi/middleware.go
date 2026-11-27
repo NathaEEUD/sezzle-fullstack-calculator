@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"runtime/debug"
 	"strings"
+	"time"
 )
 
 // recoverPanics turns a panic in next into a 500 envelope. The panic value
@@ -70,3 +71,42 @@ type missRecorder struct {
 func (m *missRecorder) Header() http.Header         { return m.header }
 func (m *missRecorder) WriteHeader(status int)      { m.status = status }
 func (m *missRecorder) Write(b []byte) (int, error) { return len(b), nil }
+
+// logRequests writes one INFO line per request with its method, path, status
+// and duration.
+func (a *api) logRequests(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		a.logger.Info("request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", rec.status,
+			"duration", time.Since(start),
+		)
+	})
+}
+
+// statusRecorder remembers the status written through it. A handler that
+// writes a body without a status has answered 200.
+type statusRecorder struct {
+	http.ResponseWriter
+	status      int
+	wroteHeader bool
+}
+
+func (s *statusRecorder) WriteHeader(status int) {
+	if !s.wroteHeader {
+		s.status, s.wroteHeader = status, true
+	}
+	s.ResponseWriter.WriteHeader(status)
+}
+
+func (s *statusRecorder) Write(b []byte) (int, error) {
+	s.wroteHeader = true
+	return s.ResponseWriter.Write(b)
+}
+
+// Unwrap lets http.ResponseController reach the server's writer.
+func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
