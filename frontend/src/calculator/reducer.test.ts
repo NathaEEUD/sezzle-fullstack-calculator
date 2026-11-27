@@ -27,6 +27,8 @@ const add = operator('add')
 const subtract = operator('subtract')
 const multiply = operator('multiply')
 const divide = operator('divide')
+const power = operator('power')
+const squareRoot: CalculatorEvent = { type: 'unaryOperator', operation: 'sqrt' }
 const equals: CalculatorEvent = { type: 'equals' }
 const decimalPoint: CalculatorEvent = { type: 'decimalPoint' }
 const deleteLastDigit: CalculatorEvent = { type: 'deleteLastDigit' }
@@ -642,6 +644,120 @@ describe('calculatorReducer', () => {
       const state = [multiply, digit('4'), equals].reduce(calculatorReducer, afterResult())
 
       expect(state.calculation).toEqual({ operation: 'multiply', operands: [5, 4] })
+    })
+  })
+
+  describe('power', () => {
+    it('sets power as the pending operation', () => {
+      const state = press(digit('2'), power)
+
+      expect(state.pending).toEqual({ operation: 'power', left: 2 })
+      expect(displayText(state)).toBe('2')
+    })
+
+    it('evaluates 2 xʸ 10 = and shows 1024', () => {
+      const asked = press(digit('2'), power, digit('1'), digit('0'), equals)
+
+      expect(asked.calculation).toEqual({ operation: 'power', operands: [2, 10] })
+      expect(displayText(calculatorReducer(asked, ok(1024)))).toBe('1024')
+    })
+
+    it('is applied with immediate execution when the next operator key is pressed', () => {
+      const state = press(digit('2'), power, digit('3'), add)
+
+      expect(state.calculation).toEqual({ operation: 'power', operands: [2, 3] })
+      expect(calculatorReducer(state, ok(8)).pending).toEqual({ operation: 'add', left: 8 })
+    })
+  })
+
+  describe('square root', () => {
+    it('asks for the square root of the entry at once', () => {
+      const state = press(digit('9'), squareRoot)
+
+      expect(state.calculation).toEqual({ operation: 'sqrt', operands: [9] })
+    })
+
+    it('shows 3 for 9 √ and makes the result the entry', () => {
+      const state = press(digit('9'), squareRoot, ok(3))
+
+      expect(displayText(state)).toBe('3')
+      expect(state.calculation).toBeNull()
+      expect(state.entry).toBe(3)
+    })
+
+    it('applies at once to a result', () => {
+      const state = press(digit('2'), add, digit('3'), equals, ok(5), squareRoot)
+
+      expect(state.calculation).toEqual({ operation: 'sqrt', operands: [5] })
+    })
+
+    it('becomes the right operand of the pending operation', () => {
+      const state = press(digit('2'), add, digit('9'), squareRoot, ok(3), equals)
+
+      expect(state.calculation).toEqual({ operation: 'add', operands: [2, 3] })
+    })
+
+    it('becomes the left operand of the next operator key', () => {
+      const state = press(digit('9'), squareRoot, ok(3), multiply)
+
+      expect(state.pending).toEqual({ operation: 'multiply', left: 3 })
+    })
+
+    it('applies to its own result when pressed again', () => {
+      const state = press(digit('8'), digit('1'), squareRoot, ok(9), squareRoot)
+
+      expect(state.calculation).toEqual({ operation: 'sqrt', operands: [9] })
+    })
+
+    it('keeps the full-precision result for the next calculation', () => {
+      const state = press(digit('2'), squareRoot, ok(Math.SQRT2), multiply, digit('2'), equals)
+
+      expect(state.calculation).toEqual({ operation: 'multiply', operands: [Math.SQRT2, 2] })
+    })
+
+    it('shows the result rounded for reading', () => {
+      expect(displayText(press(digit('2'), squareRoot, ok(Math.SQRT2)))).toBe('1.41421356237')
+    })
+
+    it('starts a new entry when a digit key follows', () => {
+      expect(displayText(press(digit('9'), squareRoot, ok(3), digit('5')))).toBe('5')
+    })
+
+    it('starts a new entry when the decimal point key follows', () => {
+      expect(displayText(press(digit('9'), squareRoot, ok(3), decimalPoint))).toBe('0.')
+    })
+
+    it('does nothing to its result on delete last digit', () => {
+      const state = press(digit('9'), squareRoot, ok(3))
+
+      expect(calculatorReducer(state, deleteLastDigit)).toBe(state)
+    })
+
+    it('leaves the last calculation for repeated equals as it was', () => {
+      const state = press(digit('2'), add, digit('3'), equals, ok(5), squareRoot, ok(Math.sqrt(5)))
+
+      expect(state.lastCalculation).toEqual({ operation: 'add', right: 3 })
+    })
+
+    it('shows Not a real number for the square root of a negative result', () => {
+      const state = press(
+        digit('0'),
+        subtract,
+        digit('9'),
+        equals,
+        ok(-9),
+        squareRoot,
+        mathsError('Not a real number'),
+      )
+
+      expect(displayText(state)).toBe('Not a real number')
+    })
+
+    it('keeps the entry from before the key when the service is unavailable', () => {
+      const before = press(digit('9'))
+      const state = [squareRoot, unavailable()].reduce(calculatorReducer, before)
+
+      expect(state).toEqual({ ...before, serviceAlert: SERVICE_UNAVAILABLE_MESSAGE })
     })
   })
 })

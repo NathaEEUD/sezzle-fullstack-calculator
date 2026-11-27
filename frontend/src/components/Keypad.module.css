@@ -20,6 +20,6 @@
   background: var(--key-bg-active);
 }
 
-.wide {
-  grid-column: span 2;
+.fullRow {
+  grid-column: 1 / -1;
 }

@@ -98,6 +98,10 @@ func TestCalculateAnswersAMathsErrorWith422(t *testing.T) {
 			`{"error":{"code":"OVERFLOW","message":"Result too large"}}`},
 		{"result too large and negative", `{"operation":"multiply","operands":[-1e200,1e200]}`,
 			`{"error":{"code":"OVERFLOW","message":"Result too large"}}`},
+		{"square root of a negative operand", `{"operation":"sqrt","operands":[-9]}`,
+			`{"error":{"code":"INVALID_OPERAND","message":"Not a real number"}}`},
+		{"zero to a negative power", `{"operation":"power","operands":[0,-1]}`,
+			`{"error":{"code":"DIVISION_BY_ZERO","message":"Cannot divide by zero"}}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

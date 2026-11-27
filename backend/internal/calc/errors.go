@@ -8,6 +8,7 @@ const (
 	CodeUnknownOperation    Code = "UNKNOWN_OPERATION"
 	CodeInvalidOperandCount Code = "INVALID_OPERAND_COUNT"
 	CodeDivisionByZero      Code = "DIVISION_BY_ZERO"
+	CodeInvalidOperand      Code = "INVALID_OPERAND"
 	CodeOverflow            Code = "OVERFLOW"
 )
 
@@ -31,5 +32,6 @@ var (
 	ErrUnknownOperation    = &Error{Code: CodeUnknownOperation}
 	ErrInvalidOperandCount = &Error{Code: CodeInvalidOperandCount}
 	ErrDivisionByZero      = &Error{Code: CodeDivisionByZero}
+	ErrInvalidOperand      = &Error{Code: CodeInvalidOperand}
 	ErrOverflow            = &Error{Code: CodeOverflow}
 )
