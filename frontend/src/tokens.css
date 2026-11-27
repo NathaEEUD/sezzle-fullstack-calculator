@@ -15,6 +15,9 @@
   --key-bg: #e7e5e4;
   --key-bg-active: #d6d3d1;
   --key-fg: #1c1917;
+  --alert-bg: #fef2f2;
+  --alert-fg: #991b1b;
+  --alert-border: #fca5a5;
 
   font-family: system-ui, sans-serif;
 }
