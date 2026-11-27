@@ -34,17 +34,17 @@ func Evaluate(name string, operands []float64) (float64, error) {
 	if name == "" {
 		return 0, &Error{Code: CodeUnknownOperation, Message: "operation is required"}
 	}
-	operation, ok := registry[name]
+	found, ok := registry[name]
 	if !ok {
 		return 0, &Error{Code: CodeUnknownOperation, Message: fmt.Sprintf("unknown operation %q", name)}
 	}
-	if len(operands) != operation.arity {
+	if len(operands) != found.arity {
 		return 0, &Error{
 			Code:    CodeInvalidOperandCount,
-			Message: fmt.Sprintf("expected %d operands for %s, got %d", operation.arity, name, len(operands)),
+			Message: fmt.Sprintf("expected %d operands for %s, got %d", found.arity, name, len(operands)),
 		}
 	}
-	return operation.apply(operands), nil
+	return found.apply(operands), nil
 }
 
 // Operations lists every operation in the registry, sorted by name.

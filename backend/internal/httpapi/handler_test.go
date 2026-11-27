@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/calc"
 	"github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi"
 )
 
@@ -163,12 +164,36 @@ func TestWithoutStaticDirNoAppIsServed(t *testing.T) {
 	}
 }
 
-func TestOperationsListsEveryOperationSortedByName(t *testing.T) {
+func TestOperationsListsEveryOperationInTheRegistrySortedByName(t *testing.T) {
 	rec := do(t, newHandler(t), http.MethodGet, "/api/v1/operations", "")
 
-	assertResponse(t, rec, http.StatusOK, `{"operations":[{"name":"add","arity":2}]}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
 	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
 		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+	var body struct {
+		Operations []struct {
+			Name  string `json:"name"`
+			Arity int    `json:"arity"`
+		} `json:"operations"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body = %s, want the operations list: %v", rec.Body.String(), err)
+	}
+
+	registry := calc.Operations()
+	if len(body.Operations) != len(registry) {
+		t.Fatalf("operations = %+v, want %+v", body.Operations, registry)
+	}
+	for i, operation := range body.Operations {
+		if operation.Name != registry[i].Name || operation.Arity != registry[i].Arity {
+			t.Errorf("operations[%d] = %+v, want %+v", i, operation, registry[i])
+		}
+		if i > 0 && body.Operations[i-1].Name >= operation.Name {
+			t.Errorf("operations[%d] %q is not after %q, want sorted by name", i, operation.Name, body.Operations[i-1].Name)
+		}
 	}
 }
 
@@ -282,16 +307,33 @@ func TestAWrongMethodIsNotAllowedAndNamesTheAllowedOnes(t *testing.T) {
 	}
 }
 
-// panickingBody panics the first time a handler reads the request body.
-type panickingBody struct{}
+// panickingBody panics with its value the first time a handler reads the
+// request body.
+type panickingBody struct{ value any }
 
-func (panickingBody) Read([]byte) (int, error) { panic("body reader exploded") }
+func (b panickingBody) Read([]byte) (int, error) { panic(b.value) }
+
+// errorLog returns the first ERROR entry among the JSON log lines.
+func errorLog(t *testing.T, logs *bytes.Buffer) map[string]any {
+	t.Helper()
+	for line := range strings.Lines(logs.String()) {
+		var entry map[string]any
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Fatalf("log line = %q, want JSON: %v", line, err)
+		}
+		if entry["level"] == "ERROR" {
+			return entry
+		}
+	}
+	t.Fatalf("logs = %q, want an ERROR entry", logs.String())
+	return nil
+}
 
 func TestAPanicInAHandlerIsAnInternalErrorAndIsLogged(t *testing.T) {
 	h, logs := newHandlerWithLogs(t)
 	rec := httptest.NewRecorder()
 
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/calculate", panickingBody{}))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/calculate", panickingBody{"body reader exploded"}))
 
 	assertResponse(t, rec, http.StatusInternalServerError,
 		`{"error":{"code":"INTERNAL_ERROR","message":"internal error"}}`)
@@ -299,14 +341,23 @@ func TestAPanicInAHandlerIsAnInternalErrorAndIsLogged(t *testing.T) {
 		t.Errorf("body = %s, want no panic text", rec.Body.String())
 	}
 
-	var entry map[string]any
-	if err := json.Unmarshal(logs.Bytes(), &entry); err != nil {
-		t.Fatalf("log = %q, want one JSON line: %v", logs.String(), err)
-	}
-	if entry["level"] != "ERROR" || entry["path"] != "/api/v1/calculate" || entry["method"] != "POST" {
+	entry := errorLog(t, logs)
+	if entry["path"] != "/api/v1/calculate" || entry["method"] != "POST" {
 		t.Errorf("log entry = %v, want an ERROR for POST /api/v1/calculate", entry)
 	}
 	if msg, _ := entry["error"].(string); !strings.Contains(msg, "body reader exploded") {
 		t.Errorf("log error = %q, want the panic value", msg)
 	}
+}
+
+func TestAnAbortedHandlerIsNotRecovered(t *testing.T) {
+	h := newHandler(t)
+	defer func() {
+		if v := recover(); v != http.ErrAbortHandler {
+			t.Errorf("recovered %v, want http.ErrAbortHandler to reach the server", v)
+		}
+	}()
+
+	h.ServeHTTP(httptest.NewRecorder(),
+		httptest.NewRequest(http.MethodPost, "/api/v1/calculate", panickingBody{http.ErrAbortHandler}))
 }

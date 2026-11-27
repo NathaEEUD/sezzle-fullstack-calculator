@@ -18,8 +18,8 @@ type operationResponse struct {
 func (a *api) operations(w http.ResponseWriter, r *http.Request) {
 	operations := calc.Operations()
 	body := operationsResponse{Operations: make([]operationResponse, len(operations))}
-	for i, op := range operations {
-		body.Operations[i] = operationResponse{Name: op.Name, Arity: op.Arity}
+	for i, operation := range operations {
+		body.Operations[i] = operationResponse{Name: operation.Name, Arity: operation.Arity}
 	}
 	a.writeJSON(w, r, http.StatusOK, body)
 }

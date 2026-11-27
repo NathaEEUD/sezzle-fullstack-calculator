@@ -18,7 +18,6 @@ const (
 // requestError is a request the service refuses before any calculation
 // runs: a bad request body, an unknown path or a wrong method.
 type requestError struct {
-	status  int
 	code    string
 	message string
 }
@@ -26,12 +25,11 @@ type requestError struct {
 func (e *requestError) Error() string { return e.message }
 
 func invalidJSON(message string) error {
-	return &requestError{status: http.StatusBadRequest, code: codeInvalidJSON, message: message}
+	return &requestError{code: codeInvalidJSON, message: message}
 }
 
 func notFound(r *http.Request) error {
 	return &requestError{
-		status:  http.StatusNotFound,
 		code:    codeNotFound,
 		message: fmt.Sprintf("no route for %s %s", r.Method, r.URL.Path),
 	}
@@ -39,7 +37,6 @@ func notFound(r *http.Request) error {
 
 func methodNotAllowed(r *http.Request, allow string) error {
 	return &requestError{
-		status:  http.StatusMethodNotAllowed,
 		code:    codeMethodNotAllowed,
 		message: fmt.Sprintf("method %s is not allowed on %s; allowed: %s", r.Method, r.URL.Path, allow),
 	}
@@ -54,11 +51,18 @@ type envelopeError struct {
 	Message string `json:"message"`
 }
 
+// requestStatus is the status of each requestError code.
+var requestStatus = map[string]int{
+	codeInvalidJSON:      http.StatusBadRequest,
+	codeNotFound:         http.StatusNotFound,
+	codeMethodNotAllowed: http.StatusMethodNotAllowed,
+}
+
 // statusFor is the one mapping from an error to its status and envelope.
 func statusFor(err error) (int, envelopeError) {
 	var reqErr *requestError
 	if errors.As(err, &reqErr) {
-		return reqErr.status, envelopeError{Code: reqErr.code, Message: reqErr.message}
+		return requestStatus[reqErr.code], envelopeError{Code: reqErr.code, Message: reqErr.message}
 	}
 	var calcErr *calc.Error
 	if errors.As(err, &calcErr) {
