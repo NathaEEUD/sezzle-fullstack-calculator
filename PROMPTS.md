@@ -15,6 +15,7 @@ The design stages (agent skills setup through to-tickets) are reused as they wer
 | Spec: to-spec | — | [Spec: to-spec](#spec-to-spec) |
 | Plan: to-tickets | — | [Plan: to-tickets](#plan-to-tickets) |
 | Build: walking skeleton (#4) | [`bafb1d07`](docs/prompts/2026-11-27-0911-bafb1d07.md) | [Build: walking skeleton](#build-walking-skeleton) |
+| Build: Docker image (#14) | [`383673a0`](docs/prompts/2026-11-27-0941-383673a0.md) | [Build: Docker image](#build-docker-image) |
 
 ## Setup: prompt capture
 
@@ -113,6 +114,29 @@ The raw log for this session also holds the two reviewers' reports, at 09:23. Th
 
 ````text
 /mattpocock-skills:implement 4 in a new branch
+````
+
+````text
+log this session in PROMPTS.md and open a PR
+````
+
+## Build: Docker image
+
+Ran Matt Pocock's `implement` on [#14](https://github.com/NathaEEUD/sezzle-fullstack-calculator/issues/14) in a new branch. The ticket is `ready-for-agent`, so the seam was taken from `CODING_STANDARDS.md` without a check-in: the Playwright suite, pointed at the running image through a new `E2E_BASE_URL`, plus a check that the image's user is `nonroot:nonroot`. `make docker-e2e` went red on the missing `Dockerfile`, then green.
+
+Midway, the gate failed in `httpapi` tests nobody had touched. Another session was building #8 in the same checkout, and switching branches had carried its uncommitted backend work onto this one. The first image build had also included that work, and that build was the only reason an `/api/v1/operations` check passed. The checkout went back to `feat/8-full-api-contract` with #8's changes untouched, and #14 moved to its own worktree, as `AGENTS.md` asks for parallel slices. There, the operations check failed because that route is still #8's, so it was dropped.
+
+The `code-review` skill then ran its Standards and Spec reviews in parallel. Neither found a blocker. Both wrongly said the evidence came from the binary: it was recorded against the image. The fixes they prompted:
+
+- `make evidence ISSUE=<n> DOCKER=1` records evidence against the image, so that path is a Make target;
+- the unused port override in `scripts/docker-e2e.sh` is gone;
+- the run command is printed once, not repeated in the help text;
+- the test says "service", the glossary's term, in place of "API".
+
+The raw log for this session also holds the two reviewers' reports, at 09:46. The hook captured them because they reached the session as messages, but nobody typed them.
+
+````text
+/mattpocock-skills:implement 14 in a new branch
 ````
 
 ````text
