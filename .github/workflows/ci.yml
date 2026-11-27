@@ -29,3 +29,6 @@ jobs:
       - run: make install
 
       - run: make gate
+
+      # Builds the image only; CI publishes nothing.
+      - run: make docker

@@ -1,0 +1,13 @@
+# Only frontend/ and backend/ sources go into the build context.
+**/node_modules
+**/.DS_Store
+.git
+.github
+.claude
+.agents
+bin
+coverage
+docs
+e2e
+scripts
+frontend/dist

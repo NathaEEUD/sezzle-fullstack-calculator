@@ -2,9 +2,10 @@
 
 GO_COVER   := coverage/backend
 PLAYWRIGHT := cd e2e && npx playwright
+IMAGE      := calculator
 
 .PHONY: help install dev build build-web build-go fmt fmt-check vet lint typecheck \
-        test test-go test-web coverage e2e gate evidence
+        test test-go test-web coverage e2e gate evidence docker docker-e2e
 
 help: ## List the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -67,9 +68,21 @@ e2e: ## Playwright against the real binary serving the built app
 
 gate: fmt-check vet lint typecheck coverage e2e ## Everything CI runs
 
-evidence: ## Record the e2e tests tagged @issue-$(ISSUE) into docs/evidence/$(ISSUE)/ (not part of the gate)
+evidence: ## Record the e2e tests tagged @issue-$(ISSUE) into docs/evidence/$(ISSUE)/; DOCKER=1 records against the image (not part of the gate)
 	@if [ -z "$(ISSUE)" ]; then echo "make evidence: ISSUE is required, e.g. make evidence ISSUE=4" >&2; exit 2; fi
 	@$(PLAYWRIGHT) test --list --grep "@issue-$(ISSUE)\b" | grep -q '^Total: [1-9]' || \
 		{ echo "make evidence: no e2e test is tagged @issue-$(ISSUE)" >&2; exit 2; }
 	rm -rf "docs/evidence/$(ISSUE)"
+ifdef DOCKER
+	$(MAKE) docker
+	EVIDENCE_DIR="$(CURDIR)/docs/evidence/$(ISSUE)" scripts/docker-e2e.sh $(IMAGE) --grep "@issue-$(ISSUE)\b"
+else
 	cd e2e && EVIDENCE_DIR="$(CURDIR)/docs/evidence/$(ISSUE)" npx playwright test --grep "@issue-$(ISSUE)\b"
+endif
+
+docker: ## Build the image and print how to run it
+	docker build -t $(IMAGE) .
+	@echo "Run it with: docker run --rm -p 8080:8080 $(IMAGE)   then open http://localhost:8080"
+
+docker-e2e: docker ## Run the e2e suite against the image (not part of the gate)
+	scripts/docker-e2e.sh $(IMAGE)

@@ -1,7 +1,10 @@
 import { defineConfig, devices, type ReporterDescription } from '@playwright/test'
 
 const PORT = 8787
-const baseURL = `http://localhost:${PORT}`
+// E2E_BASE_URL points the suite at a server that is already running, such as
+// the Docker image (`make docker-e2e`); otherwise Playwright starts the binary.
+const externalBaseURL = process.env.E2E_BASE_URL
+const baseURL = externalBaseURL ?? `http://localhost:${PORT}`
 
 // `make evidence ISSUE=<n>` sets EVIDENCE_DIR: every test then records a
 // screenshot and a video, and the evidence reporter copies them there.
@@ -35,11 +38,13 @@ export default defineConfig({
     },
   ],
   // The real binary serving the built app, as in the Docker image.
-  webServer: {
-    command: `make -C .. build && PORT=${PORT} STATIC_DIR=../frontend/dist ../bin/calculator`,
-    url: `${baseURL}/healthz`,
-    // Evidence always records the current build, never a server left running.
-    reuseExistingServer: !process.env.CI && !evidenceDir,
-    timeout: 180_000,
-  },
+  webServer: externalBaseURL
+    ? undefined
+    : {
+        command: `make -C .. build && PORT=${PORT} STATIC_DIR=../frontend/dist ../bin/calculator`,
+        url: `${baseURL}/healthz`,
+        // Evidence always records the current build, never a server left running.
+        reuseExistingServer: !process.env.CI && !evidenceDir,
+        timeout: 180_000,
+      },
 })
