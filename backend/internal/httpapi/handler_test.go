@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -360,4 +361,176 @@ func TestAnAbortedHandlerIsNotRecovered(t *testing.T) {
 
 	h.ServeHTTP(httptest.NewRecorder(),
 		httptest.NewRequest(http.MethodPost, "/api/v1/calculate", panickingBody{http.ErrAbortHandler}))
+}
+
+// requestLogs returns the per-request entries among the JSON log lines.
+func requestLogs(t *testing.T, logs *bytes.Buffer) []map[string]any {
+	t.Helper()
+	var entries []map[string]any
+	for line := range strings.Lines(logs.String()) {
+		var entry map[string]any
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Fatalf("log line = %q, want JSON: %v", line, err)
+		}
+		if entry["msg"] == "request" {
+			entries = append(entries, entry)
+		}
+	}
+	return entries
+}
+
+func TestEachRequestLogsOneLineWithMethodPathStatusAndDuration(t *testing.T) {
+	tests := []struct {
+		name, method, path, body string
+		status                   int
+	}{
+		{"a calculation", http.MethodPost, "/api/v1/calculate", `{"operation":"add","operands":[2,3]}`, http.StatusOK},
+		{"a bad request", http.MethodPost, "/api/v1/calculate", `{"operation":"modulo","operands":[2,3]}`,
+			http.StatusBadRequest},
+		{"an unknown path", http.MethodGet, "/api/v1/unknown", "", http.StatusNotFound},
+		{"a panic", http.MethodPost, "/api/v1/calculate", "", http.StatusInternalServerError},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h, logs := newHandlerWithLogs(t)
+			var body io.Reader = strings.NewReader(tt.body)
+			if tt.status == http.StatusInternalServerError {
+				body = panickingBody{"boom"}
+			}
+			h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(tt.method, tt.path, body))
+
+			entries := requestLogs(t, logs)
+			if len(entries) != 1 {
+				t.Fatalf("request log lines = %v, want exactly one", entries)
+			}
+			entry := entries[0]
+			if entry["level"] != "INFO" || entry["method"] != tt.method || entry["path"] != tt.path ||
+				entry["status"] != float64(tt.status) {
+				t.Errorf("request log = %v, want INFO %s %s %d", entry, tt.method, tt.path, tt.status)
+			}
+			if d, ok := entry["duration"].(float64); !ok || d < 0 {
+				t.Errorf("request log duration = %v, want a non-negative duration", entry["duration"])
+			}
+		})
+	}
+}
+
+// corsHeaders are every header the CORS middleware may set.
+var corsHeaders = []string{
+	"Access-Control-Allow-Origin",
+	"Access-Control-Allow-Methods",
+	"Access-Control-Allow-Headers",
+	"Access-Control-Max-Age",
+	"Vary",
+}
+
+func preflight(t *testing.T, h http.Handler, origin string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/calculate", nil)
+	req.Header.Set("Origin", origin)
+	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
+	req.Header.Set("Access-Control-Request-Headers", "content-type")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func calculateFrom(t *testing.T, h http.Handler, origin string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/calculate", strings.NewReader(`{"operation":"add","operands":[2,3]}`))
+	req.Header.Set("Origin", origin)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func assertNoCORSHeaders(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	for _, name := range corsHeaders {
+		if got := rec.Header().Get(name); got != "" {
+			t.Errorf("%s = %q, want no CORS headers", name, got)
+		}
+	}
+}
+
+const allowedOrigin = "https://app.example.com"
+
+func corsHandler(t *testing.T) http.Handler {
+	t.Helper()
+	return newHandler(t, httpapi.WithCORSAllowedOrigins("https://other.example.com, "+allowedOrigin))
+}
+
+func TestAnAllowedPreflightGets204WithTheCORSHeaders(t *testing.T) {
+	rec := preflight(t, corsHandler(t), allowedOrigin)
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("status = %d, want 204", rec.Code)
+	}
+	if rec.Body.Len() != 0 {
+		t.Errorf("body = %q, want empty", rec.Body.String())
+	}
+	want := map[string]string{
+		"Access-Control-Allow-Origin":  allowedOrigin,
+		"Access-Control-Allow-Methods": "GET, POST",
+		"Access-Control-Allow-Headers": "Content-Type",
+		"Access-Control-Max-Age":       "600",
+		"Vary":                         "Origin",
+	}
+	for name, value := range want {
+		if got := rec.Header().Get(name); got != value {
+			t.Errorf("%s = %q, want %q", name, got, value)
+		}
+	}
+}
+
+func TestADisallowedPreflightGetsABare403(t *testing.T) {
+	rec := preflight(t, corsHandler(t), "https://evil.example.com")
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", rec.Code)
+	}
+	if rec.Body.Len() != 0 {
+		t.Errorf("body = %q, want a bare 403", rec.Body.String())
+	}
+	assertNoCORSHeaders(t, rec)
+}
+
+func TestADisallowedSimpleRequestIsServedWithoutCORSHeaders(t *testing.T) {
+	rec := calculateFrom(t, corsHandler(t), "https://evil.example.com")
+
+	assertResponse(t, rec, http.StatusOK, `{"operation":"add","operands":[2,3],"result":5}`)
+	assertNoCORSHeaders(t, rec)
+}
+
+func TestAnAllowedSimpleRequestEchoesItsOrigin(t *testing.T) {
+	rec := calculateFrom(t, corsHandler(t), allowedOrigin)
+
+	assertResponse(t, rec, http.StatusOK, `{"operation":"add","operands":[2,3],"result":5}`)
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != allowedOrigin {
+		t.Errorf("Access-Control-Allow-Origin = %q, want %q", got, allowedOrigin)
+	}
+	if got := rec.Header().Get("Vary"); got != "Origin" {
+		t.Errorf("Vary = %q, want Origin", got)
+	}
+}
+
+func TestCORSIsOffByDefault(t *testing.T) {
+	for _, list := range []string{"", " , "} {
+		t.Run("CORS_ALLOWED_ORIGINS="+strconv.Quote(list), func(t *testing.T) {
+			h := newHandler(t, httpapi.WithCORSAllowedOrigins(list))
+
+			t.Run("a preflight is not answered", func(t *testing.T) {
+				rec := preflight(t, h, allowedOrigin)
+				if rec.Code != http.StatusMethodNotAllowed {
+					t.Errorf("status = %d, want 405", rec.Code)
+				}
+				assertNoCORSHeaders(t, rec)
+			})
+			t.Run("a request from another origin gets no CORS headers", func(t *testing.T) {
+				rec := calculateFrom(t, h, allowedOrigin)
+				assertResponse(t, rec, http.StatusOK, `{"operation":"add","operands":[2,3],"result":5}`)
+				assertNoCORSHeaders(t, rec)
+			})
+		})
+	}
 }
