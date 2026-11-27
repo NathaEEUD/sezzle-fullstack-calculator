@@ -16,6 +16,7 @@ The design stages (agent skills setup through to-tickets) are reused as they wer
 | Plan: to-tickets | — | [Plan: to-tickets](#plan-to-tickets) |
 | Build: walking skeleton (#4) | [`bafb1d07`](docs/prompts/2026-11-27-0911-bafb1d07.md) | [Build: walking skeleton](#build-walking-skeleton) |
 | Build: immediate execution (#5) | [`b319431a`](docs/prompts/2026-11-27-0935-b319431a.md) | [Build: immediate execution](#build-immediate-execution) |
+| Build: full API contract (#8) | [`bca4e311`](docs/prompts/2026-11-27-0940-bca4e311.md) | [Build: full API contract](#build-full-api-contract) |
 | Build: Docker image (#14) | [`383673a0`](docs/prompts/2026-11-27-0941-383673a0.md) | [Build: Docker image](#build-docker-image) |
 
 ## Setup: prompt capture
@@ -147,6 +148,32 @@ The raw log for this session also holds the two reviewers' reports, at 09:41. Th
 log this session in PROMPTS.md and open a PR
 ````
 
+## Build: full API contract
+
+Ran Matt Pocock's `implement` on [#8](https://github.com/NathaEEUD/sezzle-fullstack-calculator/issues/8) in a new branch. The branch was cut from `origin/main` while #5 was still unmerged, so the registry held only `add`. The `tdd` seams were the ones `CODING_STANDARDS.md` already names, so they weren't proposed again: calc table tests, `httptest` against the real `NewHandler` with the logger writing to a buffer, and the `@issue-8` Playwright contract test. Each slice went red, then green: the operations list, every 400 row, 404 and 405 envelopes with the `Allow` header, and panic recovery. The panic test uses a request body that panics when read, so it needs no test-only route. To prove the contract test catches drift, a fake operation was added to `OPERATIONS`, the test failed, and the change was reverted.
+
+The `code-review` skill then ran its Standards and Spec reviews in parallel. Their fixes landed in a second commit:
+
+- the operations `httptest` hard-coded the registry, so adding an operation would have meant an `httpapi` change; it now compares against `calc.Operations()` and checks the order on its own;
+- status choice was split between the error constructors and `statusFor`, and now lives only in `statusFor`;
+- panic recovery swallowed `http.ErrAbortHandler`, and now re-panics it;
+- the glossary's _Avoid_ term `op` appeared in code.
+
+Three findings were left as they are. Unknown fields are still found by matching Go's error text, because `encoding/json` has no typed error for them and a test pins the wording. A panic after a partial write isn't handled. And a `Calculation` type to bundle operation and operands would be a wider refactor than this slice.
+
+After #5 merged, the branch was rebased onto it. The only real conflict was the registry in `calc.go`. The calc operations test then failed as expected and now lists all four operations. Coverage and evidence were regenerated in a third commit.
+
+The raw log for this session also holds the two reviewers' reports, at 09:47. The hook captured them because they reached the session as messages, but nobody typed them.
+
+````text
+/mattpocock-skills:implement 8 in a new branch
+````
+
+````text
+* #5 is already merged, fix the small conflict
+* log this session in PROMPTS.md and open a PR
+````
+
 ## Build: Docker image
 
 Ran Matt Pocock's `implement` on [#14](https://github.com/NathaEEUD/sezzle-fullstack-calculator/issues/14) in a new branch. The ticket is `ready-for-agent`, so the seam was taken from `CODING_STANDARDS.md` without a check-in: the Playwright suite, pointed at the running image through a new `E2E_BASE_URL`, plus a check that the image's user is `nonroot:nonroot`. `make docker-e2e` went red on the missing `Dockerfile`, then green.
@@ -160,6 +187,8 @@ The `code-review` skill then ran its Standards and Spec reviews in parallel. Nei
 - the run command is printed once, not repeated in the help text;
 - the test says "service", the glossary's term, in place of "API".
 
+After the PR opened, #5 and then #8 merged first. Each time, main was merged into the branch rather than rebased, so the commit the evidence links point at survives. The only conflict both times was in this file, and the gate and `make docker-e2e` were rerun on the merged tree.
+
 The raw log for this session also holds the two reviewers' reports, at 09:46. The hook captured them because they reached the session as messages, but nobody typed them.
 
 ````text
@@ -168,4 +197,8 @@ The raw log for this session also holds the two reviewers' reports, at 09:46. Th
 
 ````text
 log this session in PROMPTS.md and open a PR
+````
+
+````text
+resolve conflicts
 ````

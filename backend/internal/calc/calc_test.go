@@ -63,6 +63,8 @@ func TestEvaluateRejectsACalculationWithACalcError(t *testing.T) {
 	}{
 		{"unknown operation", "modulo", []float64{2, 3},
 			calc.CodeUnknownOperation, calc.ErrUnknownOperation, `unknown operation "modulo"`},
+		{"missing operation", "", []float64{2, 3},
+			calc.CodeUnknownOperation, calc.ErrUnknownOperation, "operation is required"},
 		{"wrong operand count", "add", []float64{2},
 			calc.CodeInvalidOperandCount, calc.ErrInvalidOperandCount, "expected 2 operands for add, got 1"},
 	}
@@ -91,5 +93,25 @@ func TestErrorTextIsItsMessage(t *testing.T) {
 	_, err := calc.Evaluate("add", nil)
 	if want := "expected 2 operands for add, got 0"; err.Error() != want {
 		t.Errorf("Error() = %q, want %q", err.Error(), want)
+	}
+}
+
+func TestOperationsListsTheRegistrySortedByName(t *testing.T) {
+	want := []calc.Operation{
+		{Name: "add", Arity: 2},
+		{Name: "divide", Arity: 2},
+		{Name: "multiply", Arity: 2},
+		{Name: "subtract", Arity: 2},
+	}
+
+	got := calc.Operations()
+
+	if len(got) != len(want) {
+		t.Fatalf("Operations() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("Operations()[%d] = %v, want %v", i, got[i], want[i])
+		}
 	}
 }
