@@ -36,9 +36,14 @@ var registry = map[string]entry{
 	"sqrt":     {arity: 1, apply: alwaysReal(func(o []float64) float64 { return math.Sqrt(o[0]) })},
 }
 
+// divisionByZero is the maths error for x ÷ 0 and for 0 to a negative power.
+func divisionByZero() *Error {
+	return &Error{Code: CodeDivisionByZero, Message: "Cannot divide by zero"}
+}
+
 func divide(o []float64) (float64, error) {
 	if o[1] == 0 {
-		return 0, &Error{Code: CodeDivisionByZero, Message: "Cannot divide by zero"}
+		return 0, divisionByZero()
 	}
 	return o[0] / o[1], nil
 }
@@ -47,7 +52,7 @@ func divide(o []float64) (float64, error) {
 // ±Inf, which reads as an overflow.
 func power(o []float64) (float64, error) {
 	if o[0] == 0 && o[1] < 0 {
-		return 0, &Error{Code: CodeDivisionByZero, Message: "Cannot divide by zero"}
+		return 0, divisionByZero()
 	}
 	return math.Pow(o[0], o[1]), nil
 }

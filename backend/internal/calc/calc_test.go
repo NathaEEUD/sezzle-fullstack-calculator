@@ -48,11 +48,11 @@ func TestEvaluateReturnsTheResultOfEachOperation(t *testing.T) {
 		{"power of zero with a positive exponent", "power", []float64{0, 3}, 0},
 		{"power of -0 with an odd exponent gives -0", "power", []float64{negativeZero, 3}, negativeZero},
 		{"power with a huge result", "power", []float64{2, 1023}, 0x1p1023},
-		{"sqrt of a perfect square", "sqrt", []float64{9}, 3},
-		{"sqrt of a fraction", "sqrt", []float64{0.25}, 0.5},
-		{"sqrt of zero", "sqrt", []float64{0}, 0},
-		{"sqrt of -0 gives -0", "sqrt", []float64{negativeZero}, negativeZero},
-		{"sqrt of a huge operand", "sqrt", []float64{1e308}, 1e154},
+		{"square root of a perfect square", "sqrt", []float64{9}, 3},
+		{"square root of a fraction", "sqrt", []float64{0.25}, 0.5},
+		{"square root of zero", "sqrt", []float64{0}, 0},
+		{"square root of -0 gives -0", "sqrt", []float64{negativeZero}, negativeZero},
+		{"square root of a huge operand", "sqrt", []float64{1e308}, 1e154},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -98,9 +98,9 @@ func TestEvaluateRejectsACalculationWithACalcError(t *testing.T) {
 			calc.CodeOverflow, calc.ErrOverflow, "Result too large"},
 		{"divide overflows to +Inf", "divide", []float64{1e300, 1e-300},
 			calc.CodeOverflow, calc.ErrOverflow, "Result too large"},
-		{"wrong operand count for sqrt", "sqrt", []float64{4, 2},
+		{"wrong operand count for square root", "sqrt", []float64{4, 2},
 			calc.CodeInvalidOperandCount, calc.ErrInvalidOperandCount, "expected 1 operands for sqrt, got 2"},
-		{"sqrt of a negative operand", "sqrt", []float64{-9},
+		{"square root of a negative operand", "sqrt", []float64{-9},
 			calc.CodeInvalidOperand, calc.ErrInvalidOperand, "Not a real number"},
 		{"power of a negative base with a non-integer exponent", "power", []float64{-8, 1.0 / 3},
 			calc.CodeInvalidOperand, calc.ErrInvalidOperand, "Not a real number"},
