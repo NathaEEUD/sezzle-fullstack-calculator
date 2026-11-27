@@ -18,6 +18,7 @@ The design stages (agent skills setup through to-tickets) are reused as they wer
 | Build: immediate execution (#5) | [`b319431a`](docs/prompts/2026-11-27-0935-b319431a.md) | [Build: immediate execution](#build-immediate-execution) |
 | Build: full API contract (#8) | [`bca4e311`](docs/prompts/2026-11-27-0940-bca4e311.md) | [Build: full API contract](#build-full-api-contract) |
 | Build: Docker image (#14) | [`383673a0`](docs/prompts/2026-11-27-0941-383673a0.md) | [Build: Docker image](#build-docker-image) |
+| Build: service unavailable (#9) | [`6289e825`](docs/prompts/2026-11-27-1006-6289e825.md) | [Build: service unavailable](#build-service-unavailable) |
 
 ## Setup: prompt capture
 
@@ -201,4 +202,41 @@ log this session in PROMPTS.md and open a PR
 
 ````text
 resolve conflicts
+````
+
+## Build: service unavailable
+
+Ran Matt Pocock's `implement` on [#9](https://github.com/NathaEEUD/sezzle-fullstack-calculator/issues/9) in a new branch, in its own worktree. The `tdd` seams were the ones `CODING_STANDARDS.md` already names, so they weren't proposed again. Those seams were a fake `fetch` for the client, plain reducer tests, Testing Library with a fake client, and the `@issue-9` Playwright test on Chromium and 360 px.
+
+The client and reducer slices each went red, then green:
+
+- a 5 s abort covers the body as well as the response;
+- on service unavailable, the state from before the keypress is kept and the service alert shows the message until the next keypress;
+- keys are ignored while a calculation is in flight.
+
+Two tests passed on their first run because the reducer slice had already made them true: the Testing Library test for in-flight keys, and the e2e test. The in-flight rule lives in the reducer, which the standards say holds every keypad rule, rather than in `useCalculator`, where the issue's wording puts it.
+
+The first `make gate` failed in the new e2e test. Playwright had reused a server on :8787 that another worktree had started, and its build already had #6's clear and delete keys. Once that server stopped, the gate went green.
+
+The `code-review` skill then ran its Standards and Spec reviews in parallel. Neither found a blocker. Their fixes landed in a second commit:
+
+- the only "no envelope" client test had an empty body, so it took the unparseable-body path; a `500 {}` row now covers the fallback message;
+- the state field is now `serviceAlert`, after the standards' term;
+- `useCalculator` no longer re-exports `KeyEvent`.
+
+Four findings were left as they are:
+
+- The new alert tokens have no dark-mode override; dark mode is #12's.
+- The timeout tests use Vitest's fake timers rather than an injected clock.
+- The `maths_error` branch keeps its old behaviour; it is #7's to change.
+- A `fetch` that ignores the abort signal would still hang. Real `fetch` honours the signal.
+
+The hook wrote this session's raw log into the main checkout, whose branch was `feat/8-full-api-contract`; it was copied into this branch. The log also holds the two reviewers' reports, at 10:11. The hook captured them because they reached the session as messages, but nobody typed them.
+
+````text
+/mattpocock-skills:implement 9 in a new branch
+````
+
+````text
+log this session in PROMPTS.md and open a PR
 ````
