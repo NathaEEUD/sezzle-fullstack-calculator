@@ -23,9 +23,10 @@ Read `GLOSSARY.md`, the ADRs in `docs/adr/`, and `CODING_STANDARDS.md`. Use the 
 
 1. One issue. Take it from GitHub, or file it first (`docs/agents/issue-tracker.md`).
 2. One branch from fresh main: `git fetch origin && git switch -c <type>/<slug> origin/main` (`feat/`, `fix/`, `docs/`, `chore/`).
-3. Tests first, at the seam `CODING_STANDARDS.md` names for that layer. See them fail, then make them pass.
+3. Tests first, at the seam `CODING_STANDARDS.md` names for that layer. See them fail, then make them pass. Tag each e2e test the slice adds with its issue: `test('…', { tag: '@issue-<n>' }, …)`.
 4. `make gate` is green.
-5. One PR, whose body says `Closes #<issue>`.
+5. `make evidence ISSUE=<n>` records a screenshot and video of each tagged test into `docs/evidence/<n>/`. Commit that output.
+6. One PR, whose body links the evidence and says `Closes #<issue>`.
 
 Parallel slices each get their own worktree (`git worktree add`), one issue per worktree.
 

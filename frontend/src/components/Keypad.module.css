@@ -1,0 +1,21 @@
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.key {
+  min-width: var(--key-min-size);
+  min-height: var(--key-min-size);
+  border: none;
+  border-radius: var(--radius);
+  background: var(--key-bg);
+  color: var(--key-fg);
+  font: inherit;
+  font-size: var(--key-font-size);
+  cursor: pointer;
+}
+
+.key:active {
+  background: var(--key-bg-active);
+}

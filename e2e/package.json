@@ -1,0 +1,17 @@
+{
+  "name": "calculator-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^26.6.11",
+    "prettier": "^3.10.1",
+    "typescript": "~6.0.3"
+  }
+}
