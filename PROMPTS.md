@@ -18,6 +18,7 @@ The design stages (agent skills setup through to-tickets) are reused as they wer
 | Build: immediate execution (#5) | [`b319431a`](docs/prompts/2026-11-27-0935-b319431a.md) | [Build: immediate execution](#build-immediate-execution) |
 | Build: full API contract (#8) | [`bca4e311`](docs/prompts/2026-11-27-0940-bca4e311.md) | [Build: full API contract](#build-full-api-contract) |
 | Build: Docker image (#14) | [`383673a0`](docs/prompts/2026-11-27-0941-383673a0.md) | [Build: Docker image](#build-docker-image) |
+| Build: entry editing (#6) | [`a21f9bde`](docs/prompts/2026-11-27-1006-a21f9bde.md) | [Build: entry editing](#build-entry-editing) |
 | Build: service unavailable (#9) | [`6289e825`](docs/prompts/2026-11-27-1006-6289e825.md) | [Build: service unavailable](#build-service-unavailable) |
 
 ## Setup: prompt capture
@@ -204,6 +205,35 @@ log this session in PROMPTS.md and open a PR
 resolve conflicts
 ````
 
+## Build: entry editing
+
+Ran Matt Pocock's `implement` on [#6](https://github.com/NathaEEUD/sezzle-fullstack-calculator/issues/6) in a new branch, cut from `origin/main` in its own worktree. The `tdd` seams were the ones the ticket and `CODING_STANDARDS.md` already name, so they weren't proposed again: plain reducer tests and Testing Library with a fake client. An `@issue-6` Playwright test was added so `make evidence` had something to record.
+
+Each slice went red, then green: the decimal point, the second decimal point, `0.` on an empty entry, leading zeros, the 15-significant-digit limit, delete last digit and clear. The test for `.` starting the right operand passed on its first run, because `Number('.5')` is already 0.5, and it was kept as a guard. Three choices the ticket left open were made and pinned by tests:
+
+- the decimal point and zeros before the first non-zero digit don't count toward the limit;
+- deleting the only digit leaves `0`, so the operand becomes 0;
+- delete does nothing to a result or straight after an operator key.
+
+The worktree had no `node_modules`, so the first test run failed on a missing package until `npm ci` ran in `frontend/` and `e2e/`.
+
+The `code-review` skill then ran its Standards and Spec reviews in parallel. Neither found a violation. Their fixes landed in a second commit:
+
+- the reducer tests' `type` helper became `typeEntry` at file scope, next to `press`;
+- the `entry` field now says that `'0'` is a typed zero, distinct from `''`.
+
+The other findings were left as they are. The click loop duplicated across the e2e specs and component tests predates this slice. The Spec review flagged two edge cases as calls for a person: `2 + 3 ⌫ =` sends 2 + 0 while `2 + =` does nothing, and zeros straight after the decimal point can grow an entry without limit.
+
+The hook writes to the main checkout, so the raw log was copied into this branch. It also holds the two reviewers' reports, at 10:11, and the worktree note the app added to the last prompt. The hook captured both, but nobody typed them.
+
+````text
+/mattpocock-skills:implement 6 in a new branch
+````
+
+````text
+log this session in PROMPTS.md and open a PR
+````
+
 ## Build: service unavailable
 
 Ran Matt Pocock's `implement` on [#9](https://github.com/NathaEEUD/sezzle-fullstack-calculator/issues/9) in a new branch, in its own worktree. The `tdd` seams were the ones `CODING_STANDARDS.md` already names, so they weren't proposed again. Those seams were a fake `fetch` for the client, plain reducer tests, Testing Library with a fake client, and the `@issue-9` Playwright test on Chromium and 360 px.
@@ -231,6 +261,8 @@ Four findings were left as they are:
 - The `maths_error` branch keeps its old behaviour; it is #7's to change.
 - A `fetch` that ignores the abort signal would still hang. Real `fetch` honours the signal.
 
+After the PR opened, #6 merged first. Main was merged into the branch rather than rebased, so the commit the evidence links point at survives. The source merged cleanly, and #6's new keys (decimal point, delete last digit, clear) are ignored while a calculation is in flight and dismiss the service alert like the others; the reducer tests now say so. The conflicts were in this file and the generated coverage reports, which were regenerated.
+
 The hook wrote this session's raw log into the main checkout, whose branch was `feat/8-full-api-contract`; it was copied into this branch. The log also holds the two reviewers' reports, at 10:11. The hook captured them because they reached the session as messages, but nobody typed them.
 
 ````text
@@ -239,4 +271,8 @@ The hook wrote this session's raw log into the main checkout, whose branch was `
 
 ````text
 log this session in PROMPTS.md and open a PR
+````
+
+````text
+resolve conflicts
 ````

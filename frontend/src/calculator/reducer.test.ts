@@ -13,6 +13,11 @@ function press(...events: CalculatorEvent[]): CalculatorState {
   return events.reduce(calculatorReducer, initialState)
 }
 
+/** Presses the digit and decimal point keys that spell out an entry, such as '12.5'. */
+function typeEntry(keys: string): CalculatorState {
+  return press(...[...keys].map((key) => (key === '.' ? decimalPoint : digit(key))))
+}
+
 const digit = (d: string): CalculatorEvent => ({ type: 'digit', digit: d })
 const operator = (operation: OperationName): CalculatorEvent => ({ type: 'operator', operation })
 const add = operator('add')
@@ -20,6 +25,9 @@ const subtract = operator('subtract')
 const multiply = operator('multiply')
 const divide = operator('divide')
 const equals: CalculatorEvent = { type: 'equals' }
+const decimalPoint: CalculatorEvent = { type: 'decimalPoint' }
+const deleteLastDigit: CalculatorEvent = { type: 'deleteLastDigit' }
+const clear: CalculatorEvent = { type: 'clear' }
 const ok = (result: number): CalculatorEvent => ({
   type: 'outcome',
   outcome: { kind: 'ok', result },
@@ -112,6 +120,9 @@ describe('calculatorReducer', () => {
       ['a digit key', digit('4'), '34'],
       ['an operator key', multiply, '3'],
       ['equals', equals, '3'],
+      ['the decimal point key', decimalPoint, '3.'],
+      ['delete last digit', deleteLastDigit, '0'],
+      ['clear', clear, '0'],
     ])('clears the service alert on the next keypress, %s', (_, key, display) => {
       const state = calculatorReducer(
         press(digit('2'), add, digit('3'), equals, unavailable()),
@@ -143,6 +154,9 @@ describe('calculatorReducer', () => {
       ['a digit key', digit('4')],
       ['an operator key', multiply],
       ['equals', equals],
+      ['the decimal point key', decimalPoint],
+      ['delete last digit', deleteLastDigit],
+      ['clear', clear],
     ])('ignores %s until the outcome arrives', (_, key) => {
       const state = inFlight()
 
@@ -276,6 +290,122 @@ describe('calculatorReducer', () => {
     it('does nothing on equals when there is no last calculation', () => {
       const state = press(digit('2'), equals)
 
+      expect(calculatorReducer(state, equals)).toBe(state)
+    })
+  })
+
+  describe('entry editing', () => {
+    it('adds a fractional part with the decimal point key', () => {
+      expect(displayText(press(digit('2'), decimalPoint, digit('5')))).toBe('2.5')
+    })
+
+    it('ignores a second decimal point in the same entry', () => {
+      const state = press(digit('2'), decimalPoint, digit('5'))
+
+      expect(calculatorReducer(state, decimalPoint)).toBe(state)
+    })
+
+    it('shows 0. when the decimal point key starts an entry', () => {
+      expect(displayText(press(decimalPoint))).toBe('0.')
+    })
+
+    it('starts the right operand at 0. after an operator key', () => {
+      const state = press(digit('2'), add, decimalPoint, digit('5'), equals)
+
+      expect(state.calculation).toEqual({ operation: 'add', operands: [2, 0.5] })
+    })
+
+    it('drops a leading zero when a digit follows it', () => {
+      expect(displayText(press(digit('0'), digit('7')))).toBe('7')
+    })
+
+    it('keeps a single 0 when 0 is typed again', () => {
+      expect(displayText(press(digit('0'), digit('0'), digit('0')))).toBe('0')
+    })
+
+    it('keeps zeros after the decimal point', () => {
+      expect(displayText(press(digit('0'), decimalPoint, digit('0'), digit('7')))).toBe('0.07')
+    })
+
+    describe('15-significant-digit limit', () => {
+      it('accepts 15 significant digits', () => {
+        expect(displayText(typeEntry('123456789012345'))).toBe('123456789012345')
+      })
+
+      it('ignores a 16th significant digit', () => {
+        const state = typeEntry('123456789012345')
+
+        expect(calculatorReducer(state, digit('6'))).toBe(state)
+      })
+
+      it('does not count the decimal point', () => {
+        expect(displayText(typeEntry('1234567890.123456'))).toBe('1234567890.12345')
+      })
+
+      it('does not count zeros before the first non-zero digit', () => {
+        expect(displayText(typeEntry('0.00123456789012345'))).toBe('0.00123456789012345')
+      })
+
+      it('still accepts the decimal point at the limit', () => {
+        expect(displayText(typeEntry('123456789012345.'))).toBe('123456789012345.')
+      })
+    })
+  })
+
+  describe('delete last digit', () => {
+    it('removes the last digit of the entry', () => {
+      expect(displayText(press(digit('1'), digit('2'), digit('3'), deleteLastDigit))).toBe('12')
+    })
+
+    it('removes a trailing decimal point', () => {
+      const state = press(digit('2'), decimalPoint, deleteLastDigit)
+
+      expect(displayText(state)).toBe('2')
+      expect(displayText(calculatorReducer(state, decimalPoint))).toBe('2.')
+    })
+
+    it('leaves 0 when the only digit is removed', () => {
+      expect(displayText(press(digit('7'), deleteLastDigit))).toBe('0')
+    })
+
+    it('makes the right operand 0 when its only digit is removed', () => {
+      const state = press(digit('2'), add, digit('3'), deleteLastDigit, equals)
+
+      expect(state.calculation).toEqual({ operation: 'add', operands: [2, 0] })
+    })
+
+    it('does nothing to a result', () => {
+      const state = press(digit('2'), add, digit('3'), equals, ok(5))
+
+      expect(calculatorReducer(state, deleteLastDigit)).toBe(state)
+    })
+
+    it('does nothing after an operator key', () => {
+      const state = press(digit('2'), add)
+
+      expect(calculatorReducer(state, deleteLastDigit)).toBe(state)
+    })
+  })
+
+  describe('clear', () => {
+    it('resets an entry to 0', () => {
+      const state = press(digit('4'), decimalPoint, digit('2'), clear)
+
+      expect(state).toEqual(initialState)
+      expect(displayText(state)).toBe('0')
+    })
+
+    it('forgets the pending operation', () => {
+      const state = press(digit('2'), add, digit('3'), clear, digit('4'), equals)
+
+      expect(state.pending).toBeNull()
+      expect(state.calculation).toBeNull()
+    })
+
+    it('forgets the result and the last calculation', () => {
+      const state = press(digit('2'), add, digit('3'), equals, ok(5), clear)
+
+      expect(state).toEqual(initialState)
       expect(calculatorReducer(state, equals)).toBe(state)
     })
   })

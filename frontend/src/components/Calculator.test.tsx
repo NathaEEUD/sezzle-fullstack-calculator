@@ -55,9 +55,37 @@ describe('Calculator', () => {
       'multiply',
       'divide',
       'equals',
+      'decimal point',
+      'delete last digit',
+      'clear',
     ]) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument()
     }
+  })
+
+  it('types 2 . 5 and shows 2.5 on the display', async () => {
+    const user = userEvent.setup()
+    render(<Calculator client={fakeClient({ kind: 'ok', result: 0 }).client} />)
+
+    for (const name of ['2', 'decimal point', '5']) {
+      await user.click(screen.getByRole('button', { name }))
+    }
+
+    expect(screen.getByRole('status', { name: 'display' })).toHaveTextContent(/^2\.5$/)
+  })
+
+  it('fixes an entry with delete last digit and resets it with clear', async () => {
+    const user = userEvent.setup()
+    render(<Calculator client={fakeClient({ kind: 'ok', result: 0 }).client} />)
+    const display = screen.getByRole('status', { name: 'display' })
+
+    for (const name of ['1', '2', '3', 'delete last digit']) {
+      await user.click(screen.getByRole('button', { name }))
+    }
+    expect(display).toHaveTextContent(/^12$/)
+
+    await user.click(screen.getByRole('button', { name: 'clear' }))
+    expect(display).toHaveTextContent(/^0$/)
   })
 
   it('taps 2 + 3 = and shows the result from the service', async () => {

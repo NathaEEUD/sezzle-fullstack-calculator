@@ -5,7 +5,7 @@ import type { Calculation, OperationName, Outcome } from './operations'
 export type PendingOperation = { operation: OperationName; left: number }
 
 export type CalculatorState = {
-  /** The number being typed, or '' when nothing is being typed. */
+  /** The number being typed, or '' when nothing is being typed; '0' is a typed zero and makes the operand 0. */
   entry: string
   /** The latest result, at full precision. */
   result: number | null
@@ -23,6 +23,9 @@ export type CalculatorState = {
 
 export type KeyEvent =
   | { type: 'digit'; digit: string }
+  | { type: 'decimalPoint' }
+  | { type: 'deleteLastDigit' }
+  | { type: 'clear' }
   | { type: 'operator'; operation: OperationName }
   | { type: 'equals' }
 
@@ -38,6 +41,9 @@ export const initialState: CalculatorState = {
   serviceAlert: null,
 }
 
+/** An entry stops accepting digits once it holds this many significant digits. */
+const MAX_SIGNIFICANT_DIGITS = 15
+
 /** Every keypad rule. It never does arithmetic: results arrive as outcome events. */
 export function calculatorReducer(state: CalculatorState, event: CalculatorEvent): CalculatorState {
   if (event.type === 'outcome') return applyOutcome(state, event.outcome)
@@ -50,7 +56,16 @@ export function calculatorReducer(state: CalculatorState, event: CalculatorEvent
 function applyKey(state: CalculatorState, event: KeyEvent): CalculatorState {
   switch (event.type) {
     case 'digit':
-      return { ...state, entry: state.entry + event.digit }
+      if (significantDigits(state.entry) >= MAX_SIGNIFICANT_DIGITS) return state
+      return { ...state, entry: (state.entry === '0' ? '' : state.entry) + event.digit }
+    case 'decimalPoint':
+      if (state.entry.includes('.')) return state
+      return { ...state, entry: (state.entry === '' ? '0' : state.entry) + '.' }
+    case 'deleteLastDigit':
+      if (state.entry === '') return state
+      return { ...state, entry: state.entry.slice(0, -1) || '0' }
+    case 'clear':
+      return initialState
     case 'operator':
       if (state.pending !== null && state.entry !== '') {
         return {
@@ -94,6 +109,11 @@ function applyOutcome(state: CalculatorState, outcome: Outcome): CalculatorState
     case 'maths_error':
       return { ...state, calculation: null, nextOperation: null }
   }
+}
+
+/** The digits of an entry, not counting the decimal point or zeros before the first non-zero digit. */
+function significantDigits(entry: string): number {
+  return entry.replace('.', '').replace(/^0+/, '').length
 }
 
 /** Equals with nothing pending applies the last calculation again to the current result. */

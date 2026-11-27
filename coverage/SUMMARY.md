@@ -16,9 +16,9 @@ Report: [`backend/coverage.html`](backend/coverage.html)
 
 | Metric | Coverage | Threshold |
 | --- | --- | --- |
-| lines | 97.4% | 90% |
-| branches | 96.8% | 90% |
-| statements | 97.8% | none |
+| lines | 97.6% | 90% |
+| branches | 97.4% | 90% |
+| statements | 98.0% | none |
 | functions | 100.0% | none |
 
 Report: [`frontend/index.html`](frontend/index.html)
