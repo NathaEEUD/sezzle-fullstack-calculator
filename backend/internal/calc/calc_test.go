@@ -38,6 +38,12 @@ func TestEvaluateReturnsTheResultOfEachOperation(t *testing.T) {
 		{"divide by a negative operand", "divide", []float64{12, -4}, -3},
 		{"divide zero by a negative operand gives -0", "divide", []float64{0, -4}, negativeZero},
 		{"divide a tiny operand", "divide", []float64{1e-300, 1e10}, 1e-310},
+		{"percent of a base", "percent", []float64{10, 200}, 20},
+		{"percent of 1 turns 10 into 0.1", "percent", []float64{10, 1}, 0.1},
+		{"percent of a negative base", "percent", []float64{10, -50}, -5},
+		{"percent with a fractional operand", "percent", []float64{12.5, 80}, 10},
+		{"percent of a negative base with zero gives -0", "percent", []float64{0, -50}, negativeZero},
+		{"percent of a huge base", "percent", []float64{50, 1e300}, 5e299},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -83,6 +89,10 @@ func TestEvaluateRejectsACalculationWithACalcError(t *testing.T) {
 			calc.CodeOverflow, calc.ErrOverflow, "Result too large"},
 		{"divide overflows to +Inf", "divide", []float64{1e300, 1e-300},
 			calc.CodeOverflow, calc.ErrOverflow, "Result too large"},
+		{"percent overflows to +Inf", "percent", []float64{1e200, 1e200},
+			calc.CodeOverflow, calc.ErrOverflow, "Result too large"},
+		{"percent with one operand", "percent", []float64{10},
+			calc.CodeInvalidOperandCount, calc.ErrInvalidOperandCount, "expected 2 operands for percent, got 1"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -117,6 +127,7 @@ func TestOperationsListsTheRegistrySortedByName(t *testing.T) {
 		{Name: "add", Arity: 2},
 		{Name: "divide", Arity: 2},
 		{Name: "multiply", Arity: 2},
+		{Name: "percent", Arity: 2},
 		{Name: "subtract", Arity: 2},
 	}
 

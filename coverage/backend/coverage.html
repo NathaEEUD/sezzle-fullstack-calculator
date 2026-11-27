@@ -201,6 +201,8 @@ var registry = map[string]entry{
         "subtract": {arity: 2, apply: alwaysReal(func(o []float64) float64 { <span class="cov8" title="1">return o[0] - o[1] }</span>)},
         "multiply": {arity: 2, apply: alwaysReal(func(o []float64) float64 { <span class="cov8" title="1">return o[0] * o[1] }</span>)},
         "divide":   {arity: 2, apply: divide},
+        // percent is "x percent of base"; the app picks the base (ADR-0003).
+        "percent": {arity: 2, apply: alwaysReal(func(o []float64) float64 { <span class="cov8" title="1">return o[0] * o[1] / 100 }</span>)},
 }
 
 func divide(o []float64) (float64, error) {

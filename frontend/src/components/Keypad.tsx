@@ -6,7 +6,7 @@ type Key = { label: string; name: string; event: KeyEvent; wide?: boolean }
 
 const digit = (d: string): Key => ({ label: d, name: d, event: { type: 'digit', digit: d } })
 
-const operator = (label: string, operation: OperationName): Key => ({
+const operator = (label: string, operation: Exclude<OperationName, 'percent'>): Key => ({
   label,
   name: operation,
   event: { type: 'operator', operation },
@@ -15,7 +15,8 @@ const operator = (label: string, operation: OperationName): Key => ({
 /** In reading order on a four-column grid, operator keys down the right. */
 const KEYS: Key[] = [
   { label: 'C', name: 'clear', event: { type: 'clear' }, wide: true },
-  { label: '⌫', name: 'delete last digit', event: { type: 'deleteLastDigit' }, wide: true },
+  { label: '⌫', name: 'delete last digit', event: { type: 'deleteLastDigit' } },
+  { label: '%', name: 'percent', event: { type: 'percent' } },
   ...['7', '8', '9'].map(digit),
   operator('÷', 'divide'),
   ...['4', '5', '6'].map(digit),

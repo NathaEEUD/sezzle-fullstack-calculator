@@ -3,6 +3,7 @@ export const OPERATIONS = [
   { name: 'add', arity: 2 },
   { name: 'divide', arity: 2 },
   { name: 'multiply', arity: 2 },
+  { name: 'percent', arity: 2 },
   { name: 'subtract', arity: 2 },
 ] as const
 

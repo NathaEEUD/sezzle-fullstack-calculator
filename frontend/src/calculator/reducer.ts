@@ -9,6 +9,8 @@ export type CalculatorState = {
   entry: string
   /** The latest result, at full precision. */
   result: number | null
+  /** The percent key's result, which stands in for the entry until the next key. */
+  percentResult: number | null
   /** The binary operation waiting for its right operand. */
   pending: PendingOperation | null
   /** The calculation the service must evaluate before the next key, if any. */
@@ -28,14 +30,16 @@ export type KeyEvent =
   | { type: 'decimalPoint' }
   | { type: 'deleteLastDigit' }
   | { type: 'clear' }
-  | { type: 'operator'; operation: OperationName }
+  | { type: 'operator'; operation: Exclude<OperationName, 'percent'> }
   | { type: 'equals' }
+  | { type: 'percent' }
 
 export type CalculatorEvent = KeyEvent | { type: 'outcome'; outcome: Outcome }
 
 export const initialState: CalculatorState = {
   entry: '',
   result: null,
+  percentResult: null,
   pending: null,
   calculation: null,
   nextOperation: null,
@@ -73,33 +77,57 @@ function applyKey(state: CalculatorState, event: KeyEvent): CalculatorState {
   switch (event.type) {
     case 'digit':
       if (significantDigits(state.entry) >= MAX_SIGNIFICANT_DIGITS) return state
-      return { ...state, entry: (state.entry === '0' ? '' : state.entry) + event.digit }
+      return {
+        ...state,
+        entry: (state.entry === '0' ? '' : state.entry) + event.digit,
+        percentResult: null,
+      }
     case 'decimalPoint':
       if (state.entry.includes('.')) return state
-      return { ...state, entry: (state.entry === '' ? '0' : state.entry) + '.' }
+      return {
+        ...state,
+        entry: (state.entry === '' ? '0' : state.entry) + '.',
+        percentResult: null,
+      }
     case 'deleteLastDigit':
       if (state.entry === '') return state
       return { ...state, entry: state.entry.slice(0, -1) || '0' }
     case 'clear':
       return initialState
-    case 'operator':
-      if (state.pending !== null && state.entry !== '') {
+    case 'operator': {
+      const right = rightOperand(state)
+      if (state.pending !== null && right !== null) {
         return {
           ...state,
-          calculation: pendingCalculation(state.pending, state.entry),
+          calculation: pendingCalculation(state.pending, right),
           nextOperation: event.operation,
         }
       }
       return {
         ...state,
         entry: '',
+        percentResult: null,
         pending: { operation: event.operation, left: currentNumber(state) },
       }
-    case 'equals':
+    }
+    case 'equals': {
       if (state.pending === null) return repeatedEquals(state)
-      if (state.entry === '') return state
-      return { ...state, calculation: pendingCalculation(state.pending, state.entry) }
+      const right = rightOperand(state)
+      if (right === null) return state
+      return { ...state, calculation: pendingCalculation(state.pending, right) }
+    }
+    case 'percent':
+      if (state.pending !== null && rightOperand(state) === null) return state
+      return {
+        ...state,
+        calculation: { operation: 'percent', operands: [currentNumber(state), percentBase(state)] },
+      }
   }
+}
+
+/** The left operand when add or subtract is pending, otherwise 1 (ADR-0003). */
+function percentBase({ pending }: CalculatorState): number {
+  return pending?.operation === 'add' || pending?.operation === 'subtract' ? pending.left : 1
 }
 
 function applyOutcome(state: CalculatorState, outcome: Outcome): CalculatorState {
@@ -107,9 +135,20 @@ function applyOutcome(state: CalculatorState, outcome: Outcome): CalculatorState
   if (calculation === null) return state
   switch (outcome.kind) {
     case 'ok':
+      if (calculation.operation === 'percent') {
+        // The percent result stands in for the entry; the pending operation and last calculation are kept.
+        return {
+          ...state,
+          entry: '',
+          percentResult: outcome.result,
+          calculation: null,
+          serviceAlert: null,
+        }
+      }
       return {
         entry: '',
         result: outcome.result,
+        percentResult: null,
         pending:
           state.nextOperation === null
             ? null
@@ -141,8 +180,14 @@ function repeatedEquals(state: CalculatorState): CalculatorState {
   return { ...state, calculation: { operation, operands: [currentNumber(state), right] } }
 }
 
-function pendingCalculation(pending: PendingOperation, entry: string): Calculation {
-  return { operation: pending.operation, operands: [pending.left, Number(entry)] }
+function pendingCalculation(pending: PendingOperation, right: number): Calculation {
+  return { operation: pending.operation, operands: [pending.left, right] }
+}
+
+/** The number typed or produced by the percent key since the last operator key, if any. */
+function rightOperand(state: CalculatorState): number | null {
+  if (state.entry !== '') return Number(state.entry)
+  return state.percentResult
 }
 
 /** What the display shows for a state. */
@@ -153,6 +198,5 @@ export function displayText(state: CalculatorState): string {
 }
 
 function currentNumber(state: CalculatorState): number {
-  if (state.entry !== '') return Number(state.entry)
-  return state.pending?.left ?? state.result ?? 0
+  return rightOperand(state) ?? state.pending?.left ?? state.result ?? 0
 }

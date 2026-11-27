@@ -32,6 +32,8 @@ var registry = map[string]entry{
 	"subtract": {arity: 2, apply: alwaysReal(func(o []float64) float64 { return o[0] - o[1] })},
 	"multiply": {arity: 2, apply: alwaysReal(func(o []float64) float64 { return o[0] * o[1] })},
 	"divide":   {arity: 2, apply: divide},
+	// percent is "x percent of base"; the app picks the base (ADR-0003).
+	"percent": {arity: 2, apply: alwaysReal(func(o []float64) float64 { return o[0] * o[1] / 100 })},
 }
 
 func divide(o []float64) (float64, error) {
