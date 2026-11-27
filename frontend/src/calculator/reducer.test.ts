@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { SERVICE_UNAVAILABLE_MESSAGE } from '../api/client'
 import {
   calculatorReducer,
   displayText,
@@ -35,10 +36,10 @@ describe('calculatorReducer', () => {
     expect(displayText(press(digit('2'), add, digit('3')))).toBe('3')
   })
 
-  it('requests the calculation when equals is pressed', () => {
+  it('asks for the calculation to be evaluated when equals is pressed', () => {
     const state = press(digit('2'), add, digit('3'), equals)
 
-    expect(state.request).toEqual({ operation: 'add', operands: [2, 3] })
+    expect(state.calculation).toEqual({ operation: 'add', operands: [2, 3] })
   })
 
   it('shows the result when the calculation comes back', () => {
@@ -48,7 +49,7 @@ describe('calculatorReducer', () => {
     })
 
     expect(displayText(state)).toBe('5')
-    expect(state.request).toBeNull()
+    expect(state.calculation).toBeNull()
     expect(state.pending).toBeNull()
   })
 
@@ -73,11 +74,11 @@ describe('calculatorReducer', () => {
     expect(calculatorReducer(state, equals)).toBe(state)
   })
 
-  it('clears the request when the calculation fails, keeping the state from before', () => {
+  it('keeps the state from before equals when the service is unavailable', () => {
     const before = press(digit('2'), add, digit('3'))
     const state = calculatorReducer(calculatorReducer(before, equals), {
       type: 'outcome',
-      outcome: { kind: 'unavailable', message: "Can't reach the calculator service. Try again." },
+      outcome: { kind: 'unavailable', message: SERVICE_UNAVAILABLE_MESSAGE },
     })
 
     expect(state).toEqual(before)

@@ -7,8 +7,8 @@ export type CalculatorState = {
   result: number | null
   /** The binary operation waiting for its right operand. */
   pending: { operation: OperationName; left: number } | null
-  /** The calculation to send to the service, while one is needed. */
-  request: Calculation | null
+  /** The calculation the service must evaluate before the next key, if any. */
+  calculation: Calculation | null
 }
 
 export type CalculatorEvent =
@@ -21,7 +21,7 @@ export const initialState: CalculatorState = {
   entry: '',
   result: null,
   pending: null,
-  request: null,
+  calculation: null,
 }
 
 /** Every keypad rule. It never does arithmetic: results arrive as outcome events. */
@@ -39,14 +39,14 @@ export function calculatorReducer(state: CalculatorState, event: CalculatorEvent
       if (state.pending === null || state.entry === '') return state
       return {
         ...state,
-        request: {
+        calculation: {
           operation: state.pending.operation,
           operands: [state.pending.left, Number(state.entry)],
         },
       }
     case 'outcome':
-      if (event.outcome.kind !== 'ok') return { ...state, request: null }
-      return { entry: '', result: event.outcome.result, pending: null, request: null }
+      if (event.outcome.kind !== 'ok') return { ...state, calculation: null }
+      return { entry: '', result: event.outcome.result, pending: null, calculation: null }
   }
 }
 

@@ -9,15 +9,15 @@ export function useCalculator(client: CalculatorClient) {
   const [state, dispatch] = useReducer(calculatorReducer, initialState)
 
   useEffect(() => {
-    if (state.request === null) return
+    if (state.calculation === null) return
     let current = true
-    void client.calculate(state.request).then((outcome) => {
+    void client.calculate(state.calculation).then((outcome) => {
       if (current) dispatch({ type: 'outcome', outcome })
     })
     return () => {
       current = false
     }
-  }, [client, state.request])
+  }, [client, state.calculation])
 
   return { display: displayText(state), onKey: (key: KeyEvent) => dispatch(key) }
 }

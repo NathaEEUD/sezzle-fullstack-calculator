@@ -63,7 +63,7 @@
 				
 				<option value="file3">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/calculate.go (100.0%)</option>
 				
-				<option value="file4">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/errors.go (76.9%)</option>
+				<option value="file4">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/errors.go (92.3%)</option>
 				
 				<option value="file5">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/handler.go (100.0%)</option>
 				
@@ -170,17 +170,17 @@ var registry = map[string]operation{
 // Evaluate applies the named operation to its operands and returns the raw
 // result, or a *Error.
 func Evaluate(name string, operands []float64) (float64, error) {
-        <span class="cov8" title="1">op, ok := registry[name]
+        <span class="cov8" title="1">operation, ok := registry[name]
         if !ok </span>{
                 <span class="cov8" title="1">return 0, &amp;Error{Code: CodeUnknownOperation, Message: fmt.Sprintf("unknown operation %q", name)}
 </span>        }
-        <span class="cov8" title="1">if len(operands) != op.arity </span>{
+        <span class="cov8" title="1">if len(operands) != operation.arity </span>{
                 <span class="cov8" title="1">return 0, &amp;Error{
                         Code:    CodeInvalidOperandCount,
-                        Message: fmt.Sprintf("expected %d operands for %s, got %d", op.arity, name, len(operands)),
+                        Message: fmt.Sprintf("expected %d operands for %s, got %d", operation.arity, name, len(operands)),
 </span>                }
         }
-        <span class="cov8" title="1">return op.apply(operands), nil</span>
+        <span class="cov8" title="1">return operation.apply(operands), nil</span>
 }
 </pre>
 		
@@ -249,18 +249,8 @@ func (a *api) calculate(w http.ResponseWriter, r *http.Request) {
                 <span class="cov8" title="1">a.writeError(w, r, err)
                 return
 </span>        }
-        <span class="cov8" title="1">writeJSON(w, http.StatusOK, calculationResponse{Operation: req.Operation, Operands: req.Operands, Result: result})</span>
+        <span class="cov8" title="1">a.writeJSON(w, r, http.StatusOK, calculationResponse{Operation: req.Operation, Operands: req.Operands, Result: result})</span>
 }
-
-func (a *api) healthz(w http.ResponseWriter, _ *http.Request) {
-        <span class="cov8" title="1">writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-</span>}
-
-func writeJSON(w http.ResponseWriter, status int, body any) {
-        <span class="cov8" title="1">w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(status)
-        _ = json.NewEncoder(w).Encode(body)
-</span>}
 </pre>
 		
 		<pre class="file" id="file4" style="display: none">package httpapi
@@ -307,7 +297,7 @@ func statusFor(err error) (int, envelopeError) {
                         <span class="cov8" title="1">return http.StatusBadRequest, envelopeError{Code: string(calcErr.Code), Message: calcErr.Message}</span>
                 }
         }
-        <span class="cov0" title="0">return http.StatusInternalServerError, envelopeError{Code: codeInternalError, Message: "internal error"}</span>
+        <span class="cov8" title="1">return http.StatusInternalServerError, envelopeError{Code: codeInternalError, Message: "internal error"}</span>
 }
 
 // writeError answers with the envelope for err. Go error text goes to the log,
@@ -315,9 +305,9 @@ func statusFor(err error) (int, envelopeError) {
 func (a *api) writeError(w http.ResponseWriter, r *http.Request, err error) {
         <span class="cov8" title="1">status, body := statusFor(err)
         if status &gt;= http.StatusInternalServerError </span>{
-                <span class="cov0" title="0">a.logger.Error("request failed", "method", r.Method, "path", r.URL.Path, "error", err)
+                <span class="cov8" title="1">a.logger.Error("request failed", "method", r.Method, "path", r.URL.Path, "error", err)
 </span>        }
-        <span class="cov8" title="1">writeJSON(w, status, envelope{Error: body})</span>
+        <span class="cov8" title="1">a.writeJSON(w, r, status, envelope{Error: body})</span>
 }
 </pre>
 		
@@ -326,6 +316,8 @@ func (a *api) writeError(w http.ResponseWriter, r *http.Request, err error) {
 package httpapi
 
 import (
+        "encoding/json"
+        "fmt"
         "log/slog"
         "net/http"
 )
@@ -362,6 +354,23 @@ func NewHandler(logger *slog.Logger, opts ...Option) http.Handler {
 
 type api struct {
         logger *slog.Logger
+}
+
+func (a *api) healthz(w http.ResponseWriter, r *http.Request) {
+        <span class="cov8" title="1">a.writeJSON(w, r, http.StatusOK, map[string]string{"status": "ok"})
+</span>}
+
+// writeJSON encodes body before writing any header, so a body that can't be
+// encoded becomes a 500 envelope instead of an empty 200.
+func (a *api) writeJSON(w http.ResponseWriter, r *http.Request, status int, body any) {
+        <span class="cov8" title="1">data, err := json.Marshal(body)
+        if err != nil </span>{
+                <span class="cov8" title="1">a.writeError(w, r, fmt.Errorf("encode response: %w", err))
+                return
+</span>        }
+        <span class="cov8" title="1">w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(status)
+        _, _ = w.Write(append(data, '\n'))</span>
 }
 </pre>
 		

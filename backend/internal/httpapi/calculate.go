@@ -30,15 +30,5 @@ func (a *api) calculate(w http.ResponseWriter, r *http.Request) {
 		a.writeError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, calculationResponse{Operation: req.Operation, Operands: req.Operands, Result: result})
-}
-
-func (a *api) healthz(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-}
-
-func writeJSON(w http.ResponseWriter, status int, body any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
+	a.writeJSON(w, r, http.StatusOK, calculationResponse{Operation: req.Operation, Operands: req.Operands, Result: result})
 }

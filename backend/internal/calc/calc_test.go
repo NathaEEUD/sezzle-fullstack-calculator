@@ -31,39 +31,38 @@ func TestEvaluateReturnsTheResultOfEachOperation(t *testing.T) {
 	}
 }
 
-func TestEvaluateRejectsAnUnknownOperation(t *testing.T) {
-	_, err := calc.Evaluate("modulo", []float64{2, 3})
+func TestEvaluateRejectsACalculationWithACalcError(t *testing.T) {
+	tests := []struct {
+		name        string
+		operation   string
+		operands    []float64
+		wantCode    calc.Code
+		wantErr     error
+		wantMessage string
+	}{
+		{"unknown operation", "modulo", []float64{2, 3},
+			calc.CodeUnknownOperation, calc.ErrUnknownOperation, `unknown operation "modulo"`},
+		{"wrong operand count", "add", []float64{2},
+			calc.CodeInvalidOperandCount, calc.ErrInvalidOperandCount, "expected 2 operands for add, got 1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := calc.Evaluate(tt.operation, tt.operands)
 
-	var calcErr *calc.Error
-	if !errors.As(err, &calcErr) {
-		t.Fatalf("error = %v, want *calc.Error", err)
-	}
-	if calcErr.Code != calc.CodeUnknownOperation {
-		t.Errorf("Code = %q, want %q", calcErr.Code, calc.CodeUnknownOperation)
-	}
-	if !errors.Is(err, calc.ErrUnknownOperation) {
-		t.Errorf("errors.Is(err, ErrUnknownOperation) = false")
-	}
-	if want := `unknown operation "modulo"`; calcErr.Message != want {
-		t.Errorf("Message = %q, want %q", calcErr.Message, want)
-	}
-}
-
-func TestEvaluateRejectsTheWrongOperandCount(t *testing.T) {
-	_, err := calc.Evaluate("add", []float64{2})
-
-	var calcErr *calc.Error
-	if !errors.As(err, &calcErr) {
-		t.Fatalf("error = %v, want *calc.Error", err)
-	}
-	if calcErr.Code != calc.CodeInvalidOperandCount {
-		t.Errorf("Code = %q, want %q", calcErr.Code, calc.CodeInvalidOperandCount)
-	}
-	if !errors.Is(err, calc.ErrInvalidOperandCount) {
-		t.Errorf("errors.Is(err, ErrInvalidOperandCount) = false")
-	}
-	if want := "expected 2 operands for add, got 1"; calcErr.Message != want {
-		t.Errorf("Message = %q, want %q", calcErr.Message, want)
+			var calcErr *calc.Error
+			if !errors.As(err, &calcErr) {
+				t.Fatalf("error = %v, want *calc.Error", err)
+			}
+			if calcErr.Code != tt.wantCode {
+				t.Errorf("Code = %q, want %q", calcErr.Code, tt.wantCode)
+			}
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("errors.Is(err, %v) = false", tt.wantCode)
+			}
+			if calcErr.Message != tt.wantMessage {
+				t.Errorf("Message = %q, want %q", calcErr.Message, tt.wantMessage)
+			}
+		})
 	}
 }
 

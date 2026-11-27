@@ -18,15 +18,15 @@ var registry = map[string]operation{
 // Evaluate applies the named operation to its operands and returns the raw
 // result, or a *Error.
 func Evaluate(name string, operands []float64) (float64, error) {
-	op, ok := registry[name]
+	operation, ok := registry[name]
 	if !ok {
 		return 0, &Error{Code: CodeUnknownOperation, Message: fmt.Sprintf("unknown operation %q", name)}
 	}
-	if len(operands) != op.arity {
+	if len(operands) != operation.arity {
 		return 0, &Error{
 			Code:    CodeInvalidOperandCount,
-			Message: fmt.Sprintf("expected %d operands for %s, got %d", op.arity, name, len(operands)),
+			Message: fmt.Sprintf("expected %d operands for %s, got %d", operation.arity, name, len(operands)),
 		}
 	}
-	return op.apply(operands), nil
+	return operation.apply(operands), nil
 }

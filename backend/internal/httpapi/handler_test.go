@@ -77,6 +77,13 @@ func TestCalculateAnswersARejectedCalculationWithABadRequest(t *testing.T) {
 	}
 }
 
+func TestCalculateNeverAnswersAnEmpty200WhenTheResultCannotBeEncoded(t *testing.T) {
+	rec := do(t, newHandler(t), http.MethodPost, "/api/v1/calculate", `{"operation":"add","operands":[1e308,1e308]}`)
+
+	assertResponse(t, rec, http.StatusInternalServerError,
+		`{"error":{"code":"INTERNAL_ERROR","message":"internal error"}}`)
+}
+
 func TestHealthzReportsOK(t *testing.T) {
 	rec := do(t, newHandler(t), http.MethodGet, "/healthz", "")
 

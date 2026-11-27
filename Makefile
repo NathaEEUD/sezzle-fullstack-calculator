@@ -69,7 +69,7 @@ gate: fmt-check vet lint typecheck coverage e2e ## Everything CI runs
 
 evidence: ## Record the e2e tests tagged @issue-$(ISSUE) into docs/evidence/$(ISSUE)/ (not part of the gate)
 	@if [ -z "$(ISSUE)" ]; then echo "make evidence: ISSUE is required, e.g. make evidence ISSUE=4" >&2; exit 2; fi
-	@$(PLAYWRIGHT) test --list --grep "@issue-$(ISSUE)\b" 2>/dev/null | grep -q '^Total: [1-9]' || \
+	@$(PLAYWRIGHT) test --list --grep "@issue-$(ISSUE)\b" | grep -q '^Total: [1-9]' || \
 		{ echo "make evidence: no e2e test is tagged @issue-$(ISSUE)" >&2; exit 2; }
 	rm -rf "docs/evidence/$(ISSUE)"
 	cd e2e && EVIDENCE_DIR="$(CURDIR)/docs/evidence/$(ISSUE)" npx playwright test --grep "@issue-$(ISSUE)\b"

@@ -38,7 +38,8 @@ export default defineConfig({
   webServer: {
     command: `make -C .. build && PORT=${PORT} STATIC_DIR=../frontend/dist ../bin/calculator`,
     url: `${baseURL}/healthz`,
-    reuseExistingServer: !process.env.CI,
+    // Evidence always records the current build, never a server left running.
+    reuseExistingServer: !process.env.CI && !evidenceDir,
     timeout: 180_000,
   },
 })

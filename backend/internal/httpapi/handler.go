@@ -3,6 +3,8 @@
 package httpapi
 
 import (
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 )
@@ -39,4 +41,21 @@ func NewHandler(logger *slog.Logger, opts ...Option) http.Handler {
 
 type api struct {
 	logger *slog.Logger
+}
+
+func (a *api) healthz(w http.ResponseWriter, r *http.Request) {
+	a.writeJSON(w, r, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// writeJSON encodes body before writing any header, so a body that can't be
+// encoded becomes a 500 envelope instead of an empty 200.
+func (a *api) writeJSON(w http.ResponseWriter, r *http.Request, status int, body any) {
+	data, err := json.Marshal(body)
+	if err != nil {
+		a.writeError(w, r, fmt.Errorf("encode response: %w", err))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write(append(data, '\n'))
 }
