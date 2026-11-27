@@ -201,18 +201,34 @@ var registry = map[string]entry{
         "subtract": {arity: 2, apply: alwaysReal(func(o []float64) float64 { <span class="cov8" title="1">return o[0] - o[1] }</span>)},
         "multiply": {arity: 2, apply: alwaysReal(func(o []float64) float64 { <span class="cov8" title="1">return o[0] * o[1] }</span>)},
         "divide":   {arity: 2, apply: divide},
+        "power":    {arity: 2, apply: power},
+        "sqrt":     {arity: 1, apply: alwaysReal(func(o []float64) float64 { <span class="cov8" title="1">return math.Sqrt(o[0]) }</span>)},
 }
+
+// divisionByZero is the maths error for x ÷ 0 and for 0 to a negative power.
+func divisionByZero() *Error {
+        <span class="cov8" title="1">return &amp;Error{Code: CodeDivisionByZero, Message: "Cannot divide by zero"}
+</span>}
 
 func divide(o []float64) (float64, error) {
         <span class="cov8" title="1">if o[1] == 0 </span>{
-                <span class="cov8" title="1">return 0, &amp;Error{Code: CodeDivisionByZero, Message: "Cannot divide by zero"}
+                <span class="cov8" title="1">return 0, divisionByZero()
 </span>        }
         <span class="cov8" title="1">return o[0] / o[1], nil</span>
 }
 
+// power is 0 to a negative power as a division by zero; math.Pow would give
+// ±Inf, which reads as an overflow.
+func power(o []float64) (float64, error) {
+        <span class="cov8" title="1">if o[0] == 0 &amp;&amp; o[1] &lt; 0 </span>{
+                <span class="cov8" title="1">return 0, divisionByZero()
+</span>        }
+        <span class="cov8" title="1">return math.Pow(o[0], o[1]), nil</span>
+}
+
 // Evaluate applies the named operation to its operands and returns the raw
 // result, or a *Error. Every result passes one finiteness check, so a caller
-// never sees ±Inf.
+// never sees NaN or ±Inf.
 func Evaluate(name string, operands []float64) (float64, error) {
         <span class="cov8" title="1">if name == "" </span>{
                 <span class="cov8" title="1">return 0, &amp;Error{Code: CodeUnknownOperation, Message: "operation is required"}
@@ -230,6 +246,9 @@ func Evaluate(name string, operands []float64) (float64, error) {
         <span class="cov8" title="1">result, err := found.apply(operands)
         if err != nil </span>{
                 <span class="cov8" title="1">return 0, err
+</span>        }
+        <span class="cov8" title="1">if math.IsNaN(result) </span>{
+                <span class="cov8" title="1">return 0, &amp;Error{Code: CodeInvalidOperand, Message: "Not a real number"}
 </span>        }
         <span class="cov8" title="1">if math.IsInf(result, 0) </span>{
                 <span class="cov8" title="1">return 0, &amp;Error{Code: CodeOverflow, Message: "Result too large"}
@@ -258,6 +277,7 @@ const (
         CodeUnknownOperation    Code = "UNKNOWN_OPERATION"
         CodeInvalidOperandCount Code = "INVALID_OPERAND_COUNT"
         CodeDivisionByZero      Code = "DIVISION_BY_ZERO"
+        CodeInvalidOperand      Code = "INVALID_OPERAND"
         CodeOverflow            Code = "OVERFLOW"
 )
 
@@ -281,6 +301,7 @@ var (
         ErrUnknownOperation    = &amp;Error{Code: CodeUnknownOperation}
         ErrInvalidOperandCount = &amp;Error{Code: CodeInvalidOperandCount}
         ErrDivisionByZero      = &amp;Error{Code: CodeDivisionByZero}
+        ErrInvalidOperand      = &amp;Error{Code: CodeInvalidOperand}
         ErrOverflow            = &amp;Error{Code: CodeOverflow}
 )
 </pre>
@@ -517,6 +538,7 @@ var calcStatus = map[calc.Code]int{
         calc.CodeUnknownOperation:    http.StatusBadRequest,
         calc.CodeInvalidOperandCount: http.StatusBadRequest,
         calc.CodeDivisionByZero:      http.StatusUnprocessableEntity,
+        calc.CodeInvalidOperand:      http.StatusUnprocessableEntity,
         calc.CodeOverflow:            http.StatusUnprocessableEntity,
 }
 

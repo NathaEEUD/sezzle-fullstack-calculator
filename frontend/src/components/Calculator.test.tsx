@@ -54,6 +54,8 @@ describe('Calculator', () => {
       'subtract',
       'multiply',
       'divide',
+      'power',
+      'square root',
       'equals',
       'decimal point',
       'delete last digit',
@@ -126,6 +128,55 @@ describe('Calculator', () => {
       { operation: 'add', operands: [2, 3] },
       { operation: 'multiply', operands: [5, 4] },
     ])
+  })
+
+  it('taps 2 xʸ 1 0 = and shows 1024', async () => {
+    const user = userEvent.setup()
+    const { client, calculations } = fakeClient({ kind: 'ok', result: 1024 })
+    render(<Calculator client={client} />)
+
+    for (const name of ['2', 'power', '1', '0', 'equals']) {
+      await user.click(screen.getByRole('button', { name }))
+    }
+
+    await waitFor(() =>
+      expect(screen.getByRole('status', { name: 'display' })).toHaveTextContent(/^1024$/),
+    )
+    expect(calculations).toEqual([{ operation: 'power', operands: [2, 10] }])
+  })
+
+  it('taps 9 √ and shows 3 at once', async () => {
+    const user = userEvent.setup()
+    const { client, calculations } = fakeClient({ kind: 'ok', result: 3 })
+    render(<Calculator client={client} />)
+
+    for (const name of ['9', 'square root']) {
+      await user.click(screen.getByRole('button', { name }))
+    }
+
+    await waitFor(() =>
+      expect(screen.getByRole('status', { name: 'display' })).toHaveTextContent(/^3$/),
+    )
+    expect(calculations).toEqual([{ operation: 'sqrt', operands: [9] }])
+  })
+
+  it('shows Not a real number for the square root of a negative result', async () => {
+    const user = userEvent.setup()
+    const { client } = fakeClient(({ operation }) =>
+      operation === 'sqrt'
+        ? { kind: 'maths_error', message: 'Not a real number' }
+        : { kind: 'ok', result: -9 },
+    )
+    render(<Calculator client={client} />)
+    const display = screen.getByRole('status', { name: 'display' })
+
+    for (const name of ['0', 'subtract', '9', 'equals']) {
+      await user.click(screen.getByRole('button', { name }))
+    }
+    await waitFor(() => expect(display).toHaveTextContent(/^-9$/))
+    await user.click(screen.getByRole('button', { name: 'square root' }))
+
+    await waitFor(() => expect(display).toHaveTextContent(/^Not a real number$/))
   })
 
   describe('service unavailable', () => {
