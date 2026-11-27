@@ -22,6 +22,7 @@ The design stages (agent skills setup through to-tickets) are reused as they wer
 | Build: service unavailable (#9) | [`6289e825`](docs/prompts/2026-11-27-1006-6289e825.md) | [Build: service unavailable](#build-service-unavailable) |
 | Build: CORS and per-request logging (#13) | [`62ca54f5`](docs/prompts/2026-11-27-1007-62ca54f5.md) | [Build: CORS and per-request logging](#build-cors-and-per-request-logging) |
 | Build: maths errors (#7) | [`58aa8b9d`](docs/prompts/2026-11-27-1030-58aa8b9d.md) | [Build: maths errors](#build-maths-errors) |
+| Build: percent (#11) | [`055b6c2d`](docs/prompts/2026-11-27-1046-055b6c2d.md) | [Build: percent](#build-percent) |
 
 ## Setup: prompt capture
 
@@ -336,4 +337,35 @@ The raw log for this session also holds the two reviewers' reports, at 10:34 and
 
 ````text
 Log and open PR
+````
+
+## Build: percent
+
+Ran Matt Pocock's `implement` on [#11](https://github.com/NathaEEUD/sezzle-fullstack-calculator/issues/11) in a new branch, cut from `origin/main` after #7 had merged. The ticket is `ready-for-agent`, so the `tdd` seams came from the issue's acceptance criteria and `CODING_STANDARDS.md` with no check-in: `calc` table tests, plain reducer tests, the Calculator component test, and `@issue-11` Playwright tests on Chromium and 360 px.
+
+Each slice went red, then green:
+
+- `calc`: `percent` is one registry entry, x × base / 100, with rows for −0, a huge base, overflow and the wrong operand count; `OPERATIONS` gained the same pair;
+- the reducer: a new `percent` key event requests `percent(entry, base)`, where the percent base is the left operand when add or subtract is pending, otherwise 1;
+- the reducer: the result is kept in `percentResult`, which stands in for the entry, so equals then applies the pending operation and the last calculation stays the pending operation's, not percent's;
+- the Calculator: a % key named "percent" sits in the top row, where delete last digit gave up its double width.
+
+Two cases the issue leaves open were decided here. % with a pending operation and no right operand (`2 + %`) does nothing, like equals. % pressed again takes the percent of the percent result. The operator key event no longer accepts percent, since % never becomes the pending operation. The two e2e tests, `200 + 10 % =` and `50 × 10 % =`, passed on their first run because the unit slices had already made them true.
+
+The `code-review` skill then ran its Standards and Spec reviews in parallel. Neither found a hard violation. Their fixes landed in a second commit:
+
+- after `5 + 3 = %`, equals repeated `add 3` on the percent result; it now does nothing, as it does after a typed entry;
+- `Exclude<OperationName, 'percent'>` was written three times and is now one `PendableOperationName` alias, which also types the pending operation;
+- the test helper that already includes the percent result is named `afterTwoHundredPlusTenPercent`.
+
+Two findings were left as they are. `GLOSSARY.md` lists % among the operator keys, while the code gives it its own event, because it is applied at once rather than becoming pending. And `percentResult` is reset by hand in each key branch that starts a new entry; folding entry, percent result and result into one value would reshape the reducer's state, which is more than this slice needs.
+
+The raw log for this session also holds the two reviewers' reports, at 10:50 and 10:51. The hook captured them because they reached the session as messages, but nobody typed them. The hook wrote the log into the main checkout, not the worktree, so it was copied here.
+
+````text
+/mattpocock-skills:implement 11 in a new branch
+````
+
+````text
+log this session in PROMPTS.md and open a PR
 ````
