@@ -28,7 +28,8 @@ export function createCalculatorClient(fetch: typeof globalThis.fetch): Calculat
           return { kind: 'ok', result: body.result }
         }
         const message = envelopeMessage(body)
-        // The kind comes from the status alone, never from `code` (ADR-0004).
+        // The kind comes from the status, never from `code` (ADR-0004). A 422 with no
+        // message has nothing to show in the display, so it counts as unavailable.
         if (response.status === 422 && message !== undefined) {
           return { kind: 'maths_error', message }
         }

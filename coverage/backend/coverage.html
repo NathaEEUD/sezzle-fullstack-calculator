@@ -65,7 +65,7 @@
 				
 				<option value="file4">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/cors.go (100.0%)</option>
 				
-				<option value="file5">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/errors.go (94.1%)</option>
+				<option value="file5">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/errors.go (93.8%)</option>
 				
 				<option value="file6">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/handler.go (92.3%)</option>
 				
@@ -189,17 +189,17 @@ type entry struct {
         apply func(operands []float64) (float64, error)
 }
 
-// value wraps an operation that always has a real result.
-func value(f func(o []float64) float64) func([]float64) (float64, error) {
+// alwaysReal wraps an operation that always has a real result.
+func alwaysReal(f func(o []float64) float64) func([]float64) (float64, error) {
         <span class="cov8" title="1">return func(o []float64) (float64, error) </span>{ <span class="cov8" title="1">return f(o), nil }</span>
 }
 
 // registry holds every operation the service can evaluate. Adding an
 // operation is one entry here and one table-test row.
 var registry = map[string]entry{
-        "add":      {arity: 2, apply: value(func(o []float64) float64 { <span class="cov8" title="1">return o[0] + o[1] }</span>)},
-        "subtract": {arity: 2, apply: value(func(o []float64) float64 { <span class="cov8" title="1">return o[0] - o[1] }</span>)},
-        "multiply": {arity: 2, apply: value(func(o []float64) float64 { <span class="cov8" title="1">return o[0] * o[1] }</span>)},
+        "add":      {arity: 2, apply: alwaysReal(func(o []float64) float64 { <span class="cov8" title="1">return o[0] + o[1] }</span>)},
+        "subtract": {arity: 2, apply: alwaysReal(func(o []float64) float64 { <span class="cov8" title="1">return o[0] - o[1] }</span>)},
+        "multiply": {arity: 2, apply: alwaysReal(func(o []float64) float64 { <span class="cov8" title="1">return o[0] * o[1] }</span>)},
         "divide":   {arity: 2, apply: divide},
 }
 
@@ -511,6 +511,15 @@ var requestStatus = map[string]int{
         codeMethodNotAllowed: http.StatusMethodNotAllowed,
 }
 
+// calcStatus is the status of each calc.Error code: a bad request or a maths
+// error.
+var calcStatus = map[calc.Code]int{
+        calc.CodeUnknownOperation:    http.StatusBadRequest,
+        calc.CodeInvalidOperandCount: http.StatusBadRequest,
+        calc.CodeDivisionByZero:      http.StatusUnprocessableEntity,
+        calc.CodeOverflow:            http.StatusUnprocessableEntity,
+}
+
 // statusFor is the one mapping from an error to its status and envelope.
 func statusFor(err error) (int, envelopeError) {
         <span class="cov8" title="1">var reqErr *requestError
@@ -519,12 +528,9 @@ func statusFor(err error) (int, envelopeError) {
 </span>        }
         <span class="cov8" title="1">var calcErr *calc.Error
         if errors.As(err, &amp;calcErr) </span>{
-                <span class="cov8" title="1">switch calcErr.Code </span>{
-                case calc.CodeUnknownOperation, calc.CodeInvalidOperandCount:
-                        <span class="cov8" title="1">return http.StatusBadRequest, envelopeError{Code: string(calcErr.Code), Message: calcErr.Message}</span>
-                case calc.CodeDivisionByZero, calc.CodeOverflow:
-                        <span class="cov8" title="1">return http.StatusUnprocessableEntity, envelopeError{Code: string(calcErr.Code), Message: calcErr.Message}</span>
-                }
+                <span class="cov8" title="1">if status, ok := calcStatus[calcErr.Code]; ok </span>{
+                        <span class="cov8" title="1">return status, envelopeError{Code: string(calcErr.Code), Message: calcErr.Message}
+</span>                }
         }
         <span class="cov8" title="1">return http.StatusInternalServerError, envelopeError{Code: codeInternalError, Message: "internal error"}</span>
 }

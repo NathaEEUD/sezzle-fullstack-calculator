@@ -20,17 +20,17 @@ type entry struct {
 	apply func(operands []float64) (float64, error)
 }
 
-// value wraps an operation that always has a real result.
-func value(f func(o []float64) float64) func([]float64) (float64, error) {
+// alwaysReal wraps an operation that always has a real result.
+func alwaysReal(f func(o []float64) float64) func([]float64) (float64, error) {
 	return func(o []float64) (float64, error) { return f(o), nil }
 }
 
 // registry holds every operation the service can evaluate. Adding an
 // operation is one entry here and one table-test row.
 var registry = map[string]entry{
-	"add":      {arity: 2, apply: value(func(o []float64) float64 { return o[0] + o[1] })},
-	"subtract": {arity: 2, apply: value(func(o []float64) float64 { return o[0] - o[1] })},
-	"multiply": {arity: 2, apply: value(func(o []float64) float64 { return o[0] * o[1] })},
+	"add":      {arity: 2, apply: alwaysReal(func(o []float64) float64 { return o[0] + o[1] })},
+	"subtract": {arity: 2, apply: alwaysReal(func(o []float64) float64 { return o[0] - o[1] })},
+	"multiply": {arity: 2, apply: alwaysReal(func(o []float64) float64 { return o[0] * o[1] })},
 	"divide":   {arity: 2, apply: divide},
 }
 
