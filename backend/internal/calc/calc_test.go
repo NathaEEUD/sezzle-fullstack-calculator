@@ -97,7 +97,12 @@ func TestErrorTextIsItsMessage(t *testing.T) {
 }
 
 func TestOperationsListsTheRegistrySortedByName(t *testing.T) {
-	want := []calc.Operation{{Name: "add", Arity: 2}}
+	want := []calc.Operation{
+		{Name: "add", Arity: 2},
+		{Name: "divide", Arity: 2},
+		{Name: "multiply", Arity: 2},
+		{Name: "subtract", Arity: 2},
+	}
 
 	got := calc.Operations()
 

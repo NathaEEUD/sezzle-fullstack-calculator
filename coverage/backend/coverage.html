@@ -63,11 +63,15 @@
 				
 				<option value="file3">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/calculate.go (100.0%)</option>
 				
-				<option value="file4">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/errors.go (92.3%)</option>
+				<option value="file4">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/errors.go (93.8%)</option>
 				
 				<option value="file5">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/handler.go (100.0%)</option>
 				
-				<option value="file6">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/static.go (100.0%)</option>
+				<option value="file6">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/middleware.go (100.0%)</option>
+				
+				<option value="file7">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/operations.go (100.0%)</option>
+				
+				<option value="file8">github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/httpapi/static.go (100.0%)</option>
 				
 				</select>
 			</div>
@@ -154,16 +158,26 @@ func run(logger *slog.Logger) error {
 // It is pure maths and knows nothing about HTTP.
 package calc
 
-import "fmt"
+import (
+        "fmt"
+        "maps"
+        "slices"
+)
 
-type operation struct {
+// Operation names an operation the service can evaluate, with its arity.
+type Operation struct {
+        Name  string
+        Arity int
+}
+
+type entry struct {
         arity int
         apply func(operands []float64) float64
 }
 
 // registry holds every operation the service can evaluate. Adding an
 // operation is one entry here and one table-test row.
-var registry = map[string]operation{
+var registry = map[string]entry{
         "add":      {arity: 2, apply: func(o []float64) float64 { <span class="cov8" title="1">return o[0] + o[1] }</span>},
         "subtract": {arity: 2, apply: func(o []float64) float64 { <span class="cov8" title="1">return o[0] - o[1] }</span>},
         "multiply": {arity: 2, apply: func(o []float64) float64 { <span class="cov8" title="1">return o[0] * o[1] }</span>},
@@ -173,17 +187,30 @@ var registry = map[string]operation{
 // Evaluate applies the named operation to its operands and returns the raw
 // result, or a *Error.
 func Evaluate(name string, operands []float64) (float64, error) {
-        <span class="cov8" title="1">operation, ok := registry[name]
+        <span class="cov8" title="1">if name == "" </span>{
+                <span class="cov8" title="1">return 0, &amp;Error{Code: CodeUnknownOperation, Message: "operation is required"}
+</span>        }
+        <span class="cov8" title="1">found, ok := registry[name]
         if !ok </span>{
                 <span class="cov8" title="1">return 0, &amp;Error{Code: CodeUnknownOperation, Message: fmt.Sprintf("unknown operation %q", name)}
 </span>        }
-        <span class="cov8" title="1">if len(operands) != operation.arity </span>{
+        <span class="cov8" title="1">if len(operands) != found.arity </span>{
                 <span class="cov8" title="1">return 0, &amp;Error{
                         Code:    CodeInvalidOperandCount,
-                        Message: fmt.Sprintf("expected %d operands for %s, got %d", operation.arity, name, len(operands)),
+                        Message: fmt.Sprintf("expected %d operands for %s, got %d", found.arity, name, len(operands)),
 </span>                }
         }
-        <span class="cov8" title="1">return operation.apply(operands), nil</span>
+        <span class="cov8" title="1">return found.apply(operands), nil</span>
+}
+
+// Operations lists every operation in the registry, sorted by name.
+func Operations() []Operation {
+        <span class="cov8" title="1">names := slices.Sorted(maps.Keys(registry))
+        operations := make([]Operation, len(names))
+        for i, name := range names </span>{
+                <span class="cov8" title="1">operations[i] = Operation{Name: name, Arity: registry[name].arity}
+</span>        }
+        <span class="cov8" title="1">return operations</span>
 }
 </pre>
 		
@@ -224,14 +251,24 @@ var (
 
 import (
         "encoding/json"
+        "errors"
+        "fmt"
+        "io"
         "net/http"
+        "reflect"
+        "strings"
 
         "github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/calc"
 )
 
+// maxBodyBytes caps a calculation request body.
+const maxBodyBytes = 1024
+
+// calculationRequest decodes operands as pointers so a null operand is
+// rejected instead of becoming 0.
 type calculationRequest struct {
-        Operation string    `json:"operation"`
-        Operands  []float64 `json:"operands"`
+        Operation string     `json:"operation"`
+        Operands  []*float64 `json:"operands"`
 }
 
 type calculationResponse struct {
@@ -241,18 +278,82 @@ type calculationResponse struct {
 }
 
 func (a *api) calculate(w http.ResponseWriter, r *http.Request) {
-        <span class="cov8" title="1">var req calculationRequest
-        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span>{
-                <span class="cov8" title="1">a.writeError(w, r, &amp;requestError{code: codeInvalidJSON, message: "request body is not valid JSON"})
-                return
-</span>        }
-
-        <span class="cov8" title="1">result, err := calc.Evaluate(req.Operation, req.Operands)
+        <span class="cov8" title="1">operation, operands, err := decodeCalculation(w, r)
         if err != nil </span>{
                 <span class="cov8" title="1">a.writeError(w, r, err)
                 return
 </span>        }
-        <span class="cov8" title="1">a.writeJSON(w, r, http.StatusOK, calculationResponse{Operation: req.Operation, Operands: req.Operands, Result: result})</span>
+
+        <span class="cov8" title="1">result, err := calc.Evaluate(operation, operands)
+        if err != nil </span>{
+                <span class="cov8" title="1">a.writeError(w, r, err)
+                return
+</span>        }
+        <span class="cov8" title="1">a.writeJSON(w, r, http.StatusOK, calculationResponse{Operation: operation, Operands: operands, Result: result})</span>
+}
+
+// decodeCalculation reads exactly one JSON object of at most maxBodyBytes,
+// with no unknown fields and no null operands.
+func decodeCalculation(w http.ResponseWriter, r *http.Request) (string, []float64, error) {
+        <span class="cov8" title="1">dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+        dec.DisallowUnknownFields()
+</span>
+        <span class="cov8" title="1">var req calculationRequest
+        if err := dec.Decode(&amp;req); err != nil </span>{
+                <span class="cov8" title="1">return "", nil, decodeError(err)
+</span>        }
+        <span class="cov8" title="1">if err := dec.Decode(&amp;json.RawMessage{}); !errors.Is(err, io.EOF) </span>{
+                <span class="cov8" title="1">var tooLarge *http.MaxBytesError
+                if errors.As(err, &amp;tooLarge) </span>{
+                        <span class="cov8" title="1">return "", nil, decodeError(err)
+</span>                }
+                <span class="cov8" title="1">return "", nil, invalidJSON("request body has data after the JSON object")</span>
+        }
+
+        <span class="cov8" title="1">operands := make([]float64, len(req.Operands))
+        for i, operand := range req.Operands </span>{
+                <span class="cov8" title="1">if operand == nil </span>{
+                        <span class="cov8" title="1">return "", nil, invalidJSON("operands must be numbers, got null")
+</span>                }
+                <span class="cov8" title="1">operands[i] = *operand</span>
+        }
+        <span class="cov8" title="1">return req.Operation, operands, nil</span>
+}
+
+// decodeError names the specific cause of a decoding failure. Its message is
+// written here, never copied from Go's error text.
+func decodeError(err error) error {
+        <span class="cov8" title="1">var tooLarge *http.MaxBytesError
+        var wrongType *json.UnmarshalTypeError
+        switch </span>{
+        case errors.As(err, &amp;tooLarge):
+                <span class="cov8" title="1">return invalidJSON(fmt.Sprintf("request body is over %d bytes", maxBodyBytes))</span>
+        case errors.Is(err, io.EOF):
+                <span class="cov8" title="1">return invalidJSON("request body is empty")</span>
+        case errors.As(err, &amp;wrongType):
+                <span class="cov8" title="1">return typeError(wrongType)</span>
+        case strings.HasPrefix(err.Error(), "json: unknown field "):
+                <span class="cov8" title="1">name := strings.TrimPrefix(err.Error(), "json: unknown field ")
+                return invalidJSON("unknown field " + name)</span>
+        default:
+                <span class="cov8" title="1">return invalidJSON("request body is not valid JSON")</span>
+        }
+}
+
+func typeError(err *json.UnmarshalTypeError) error {
+        <span class="cov8" title="1">if literal, ok := strings.CutPrefix(err.Value, "number "); ok </span>{
+                <span class="cov8" title="1">return invalidJSON(fmt.Sprintf("operand %s is out of range", literal))
+</span>        }
+        <span class="cov8" title="1">switch </span>{
+        case err.Field == "operands" &amp;&amp; err.Type.Kind() == reflect.Slice:
+                <span class="cov8" title="1">return invalidJSON("operands must be an array of numbers, got " + err.Value)</span>
+        case strings.HasPrefix(err.Field, "operands"):
+                <span class="cov8" title="1">return invalidJSON("operands must be numbers, got " + err.Value)</span>
+        case err.Field == "operation":
+                <span class="cov8" title="1">return invalidJSON("operation must be a string, got " + err.Value)</span>
+        default:
+                <span class="cov8" title="1">return invalidJSON("request body must be a JSON object")</span>
+        }
 }
 </pre>
 		
@@ -260,23 +361,45 @@ func (a *api) calculate(w http.ResponseWriter, r *http.Request) {
 
 import (
         "errors"
+        "fmt"
         "net/http"
 
         "github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/calc"
 )
 
 const (
-        codeInvalidJSON   = "INVALID_JSON"
-        codeInternalError = "INTERNAL_ERROR"
+        codeInvalidJSON      = "INVALID_JSON"
+        codeNotFound         = "NOT_FOUND"
+        codeMethodNotAllowed = "METHOD_NOT_ALLOWED"
+        codeInternalError    = "INTERNAL_ERROR"
 )
 
-// requestError is a bad request found before any calculation runs.
+// requestError is a request the service refuses before any calculation
+// runs: a bad request body, an unknown path or a wrong method.
 type requestError struct {
         code    string
         message string
 }
 
 func (e *requestError) Error() string { <span class="cov0" title="0">return e.message }</span>
+
+func invalidJSON(message string) error {
+        <span class="cov8" title="1">return &amp;requestError{code: codeInvalidJSON, message: message}
+</span>}
+
+func notFound(r *http.Request) error {
+        <span class="cov8" title="1">return &amp;requestError{
+                code:    codeNotFound,
+                message: fmt.Sprintf("no route for %s %s", r.Method, r.URL.Path),
+</span>        }
+}
+
+func methodNotAllowed(r *http.Request, allow string) error {
+        <span class="cov8" title="1">return &amp;requestError{
+                code:    codeMethodNotAllowed,
+                message: fmt.Sprintf("method %s is not allowed on %s; allowed: %s", r.Method, r.URL.Path, allow),
+</span>        }
+}
 
 type envelope struct {
         Error envelopeError `json:"error"`
@@ -287,11 +410,18 @@ type envelopeError struct {
         Message string `json:"message"`
 }
 
+// requestStatus is the status of each requestError code.
+var requestStatus = map[string]int{
+        codeInvalidJSON:      http.StatusBadRequest,
+        codeNotFound:         http.StatusNotFound,
+        codeMethodNotAllowed: http.StatusMethodNotAllowed,
+}
+
 // statusFor is the one mapping from an error to its status and envelope.
 func statusFor(err error) (int, envelopeError) {
         <span class="cov8" title="1">var reqErr *requestError
         if errors.As(err, &amp;reqErr) </span>{
-                <span class="cov8" title="1">return http.StatusBadRequest, envelopeError{Code: reqErr.code, Message: reqErr.message}
+                <span class="cov8" title="1">return requestStatus[reqErr.code], envelopeError{Code: reqErr.code, Message: reqErr.message}
 </span>        }
         <span class="cov8" title="1">var calcErr *calc.Error
         if errors.As(err, &amp;calcErr) </span>{
@@ -346,13 +476,17 @@ func NewHandler(logger *slog.Logger, opts ...Option) http.Handler {
 </span>        }
 
         <span class="cov8" title="1">api := &amp;api{logger: logger}
-        mux := http.NewServeMux()
-        mux.HandleFunc("POST /api/v1/calculate", api.calculate)
-        mux.HandleFunc("GET /healthz", api.healthz)
-        if cfg.staticDir != "" </span>{
-                <span class="cov8" title="1">mux.Handle("GET /", staticHandler(cfg.staticDir))
+        service := http.NewServeMux()
+        service.HandleFunc("POST /api/v1/calculate", api.calculate)
+        service.HandleFunc("GET /api/v1/operations", api.operations)
+        service.HandleFunc("GET /healthz", api.healthz)
+        if cfg.staticDir == "" </span>{
+                <span class="cov8" title="1">return api.recoverPanics(api.route(service))
 </span>        }
-        <span class="cov8" title="1">return mux</span>
+
+        <span class="cov8" title="1">app := http.NewServeMux()
+        app.Handle("GET /", staticHandler(cfg.staticDir))
+        return api.recoverPanics(serviceOrApp(api.route(service), api.route(app)))</span>
 }
 
 type api struct {
@@ -380,6 +514,107 @@ func (a *api) writeJSON(w http.ResponseWriter, r *http.Request, status int, body
 		<pre class="file" id="file6" style="display: none">package httpapi
 
 import (
+        "fmt"
+        "net/http"
+        "runtime/debug"
+        "strings"
+)
+
+// recoverPanics turns a panic in next into a 500 envelope. The panic value
+// and stack go to the log, never to the response.
+func (a *api) recoverPanics(next http.Handler) http.Handler {
+        <span class="cov8" title="1">return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span>{
+                <span class="cov8" title="1">defer func() </span>{
+                        <span class="cov8" title="1">v := recover()
+                        if v == nil </span>{
+                                <span class="cov8" title="1">return
+</span>                        }
+                        <span class="cov8" title="1">if v == http.ErrAbortHandler </span>{
+                                <span class="cov8" title="1">panic(v)</span> // the server aborts the response on purpose
+                        }
+                        <span class="cov8" title="1">a.writeError(w, r, fmt.Errorf("panic: %v\n%s", v, debug.Stack()))</span>
+                }()
+                <span class="cov8" title="1">next.ServeHTTP(w, r)</span>
+        })
+}
+
+// serviceOrApp sends /api/... and /healthz to the service and every other
+// path to the app, so the app never shadows the API.
+func serviceOrApp(service, app http.Handler) http.Handler {
+        <span class="cov8" title="1">return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span>{
+                <span class="cov8" title="1">p := r.URL.Path
+                if p == "/api" || strings.HasPrefix(p, "/api/") || p == "/healthz" </span>{
+                        <span class="cov8" title="1">service.ServeHTTP(w, r)
+                        return
+</span>                }
+                <span class="cov8" title="1">app.ServeHTTP(w, r)</span>
+        })
+}
+
+// route serves r from mux, and answers a path or method that no pattern
+// matches with an error envelope instead of the mux's plain-text reply.
+func (a *api) route(mux *http.ServeMux) http.Handler {
+        <span class="cov8" title="1">return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span>{
+                <span class="cov8" title="1">fallback, pattern := mux.Handler(r)
+                if pattern != "" </span>{
+                        <span class="cov8" title="1">mux.ServeHTTP(w, r)
+                        return
+</span>                }
+                // The mux's own fallback knows whether this is a 404 or a 405 and
+                // which methods are allowed; keep that and drop its body.
+                <span class="cov8" title="1">miss := &amp;missRecorder{header: http.Header{}}
+                fallback.ServeHTTP(miss, r)
+                if miss.status == http.StatusMethodNotAllowed </span>{
+                        <span class="cov8" title="1">allow := miss.header.Get("Allow")
+                        w.Header().Set("Allow", allow)
+                        a.writeError(w, r, methodNotAllowed(r, allow))
+                        return
+</span>                }
+                <span class="cov8" title="1">a.writeError(w, r, notFound(r))</span>
+        })
+}
+
+// missRecorder captures the status and headers of the mux's fallback reply.
+type missRecorder struct {
+        header http.Header
+        status int
+}
+
+func (m *missRecorder) Header() http.Header         { <span class="cov8" title="1">return m.header }</span>
+func (m *missRecorder) WriteHeader(status int)      { <span class="cov8" title="1">m.status = status }</span>
+func (m *missRecorder) Write(b []byte) (int, error) { <span class="cov8" title="1">return len(b), nil }</span>
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">package httpapi
+
+import (
+        "net/http"
+
+        "github.com/NathaEEUD/sezzle-fullstack-calculator/backend/internal/calc"
+)
+
+type operationsResponse struct {
+        Operations []operationResponse `json:"operations"`
+}
+
+type operationResponse struct {
+        Name  string `json:"name"`
+        Arity int    `json:"arity"`
+}
+
+func (a *api) operations(w http.ResponseWriter, r *http.Request) {
+        <span class="cov8" title="1">operations := calc.Operations()
+        body := operationsResponse{Operations: make([]operationResponse, len(operations))}
+        for i, operation := range operations </span>{
+                <span class="cov8" title="1">body.Operations[i] = operationResponse{Name: operation.Name, Arity: operation.Arity}
+</span>        }
+        <span class="cov8" title="1">a.writeJSON(w, r, http.StatusOK, body)</span>
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package httpapi
+
+import (
         "io/fs"
         "net/http"
         "os"
@@ -387,15 +622,12 @@ import (
         "strings"
 )
 
-// staticHandler serves the built app from dir. It never answers for /api/...,
-// and any path that isn't a file falls back to index.html so the app can route.
+// staticHandler serves the built app from dir. Any path that isn't a file
+// falls back to index.html so the app can route. NewHandler never sends it
+// /api/... or /healthz.
 func staticHandler(dir string) http.Handler {
         <span class="cov8" title="1">fsys := os.DirFS(dir)
         return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span>{
-                <span class="cov8" title="1">if r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/") </span>{
-                        <span class="cov8" title="1">http.NotFound(w, r)
-                        return
-</span>                }
                 <span class="cov8" title="1">name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
                 if info, err := fs.Stat(fsys, name); err != nil || info.IsDir() </span>{
                         <span class="cov8" title="1">name = "index.html"
