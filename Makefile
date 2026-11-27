@@ -8,7 +8,7 @@ IMAGE      := calculator
         test test-go test-web coverage e2e gate evidence docker docker-e2e
 
 help: ## List the targets
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
+	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
 
 install: ## Install npm dependencies and the Playwright browser
 	cd frontend && npm ci
@@ -80,8 +80,9 @@ else
 	cd e2e && EVIDENCE_DIR="$(CURDIR)/docs/evidence/$(ISSUE)" npx playwright test --grep "@issue-$(ISSUE)\b"
 endif
 
-docker: ## Build the image and print how to run it
+docker: ## Build the image and print its size and how to run it
 	docker build -t $(IMAGE) .
+	@docker image ls $(IMAGE):latest --format 'Image size: {{.Size}}'
 	@echo "Run it with: docker run --rm -p 8080:8080 $(IMAGE)   then open http://localhost:8080"
 
 docker-e2e: docker ## Run the e2e suite against the image (not part of the gate)
